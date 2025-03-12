@@ -4,7 +4,7 @@ This guide will walk you through the initial setup and configuration of the Webb
 
 ## Prerequisites
 
-- WPILib development environment (2023 or newer)
+- WPILib development environment (2025 or newer)
 - Git installed on your development machine
 - Basic understanding of swerve drive mechanics
 - Robot with swerve modules (compatible with SDS MK4/MK4i or similar)
