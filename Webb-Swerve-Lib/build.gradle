@@ -46,7 +46,7 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-def ROBOT_MAIN_CLASS = "org.webbrobotics.frc2025.Robot"
+def ROBOT_MAIN_CLASS = "org.webbrobotics.frc2025.Main"
 
 // Define my targets (RoboRIO) and artifacts (deployable files)
 // This is added by GradleRIO's backing project DeployUtils.
@@ -136,12 +136,12 @@ task(replayWatch, type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
 }
 
-// Generate drive trajectories when building
-task(generateDriveTrajectories, dependsOn: "classes", type: JavaExec) {
-    mainClass = "org.webbrobotics.frc2025.subsystems.drive.trajectory.GenerateTrajectories"
-    classpath = sourceSets.main.runtimeClasspath
-}
-compileJava.finalizedBy generateDriveTrajectories
+/*// Generate drive trajectories when building
+ task(generateDriveTrajectories, dependsOn: "classes", type: JavaExec) {
+ mainClass = "org.webbrobotics.frc2025.subsystems.drive.trajectory.GenerateTrajectories"
+ classpath = sourceSets.main.runtimeClasspath
+ }
+ compileJava.finalizedBy generateDriveTrajectories*/
 
 // Configure test task
 test {

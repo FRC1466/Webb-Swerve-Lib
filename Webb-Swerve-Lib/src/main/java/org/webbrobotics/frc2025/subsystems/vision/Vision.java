@@ -9,6 +9,7 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.wpilibj.RobotBase;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,11 +42,19 @@ public class Vision {
     cameras = new VisionIO[VisionConstants.CAMERA_NAMES.length];
 
     for (int i = 0; i < VisionConstants.CAMERA_NAMES.length; i++) {
-      cameras[i] =
-          new PhotonVisionIO(
-              VisionConstants.CAMERA_NAMES[i],
-              VisionConstants.ROBOT_TO_CAMERAS[i],
-              VisionConstants.TAG_LAYOUT);
+      if (RobotBase.isSimulation()) {
+        cameras[i] =
+            new VisionIOSim(
+                VisionConstants.CAMERA_NAMES[i],
+                VisionConstants.ROBOT_TO_CAMERAS[i],
+                VisionConstants.TAG_LAYOUT);
+      } else {
+        cameras[i] =
+            new PhotonVisionIO(
+                VisionConstants.CAMERA_NAMES[i],
+                VisionConstants.ROBOT_TO_CAMERAS[i],
+                VisionConstants.TAG_LAYOUT);
+      }
     }
   }
 
@@ -76,7 +85,13 @@ public class Vision {
     }
 
     // Log tracking data
-    logSeenAprilTags();
+    if (RobotBase.isSimulation()) {
+      Pose2d simPose = RobotState.getInstance().getEstimatedPose();
+      Logger.recordOutput("Vision/SimulationPoseSource", simPose);
+      simulationPeriodic(simPose);
+    } else {
+      logSeenAprilTags();
+    }
 
     Optional<EstimatedRobotPose> visionEst = getEstimatedGlobalPose();
     if (visionEst.isPresent()) {
@@ -291,6 +306,8 @@ public class Vision {
 
   /** Updates all simulated cameras with the current robot pose. */
   public void simulationPeriodic(Pose2d robotSimPose) {
+    // Log the simulation pose to help diagnose the issue
+    Logger.recordOutput("Vision/SimulatedPose", robotSimPose);
     for (VisionIO camera : cameras) {
       camera.simulationPeriodic(robotSimPose);
     }

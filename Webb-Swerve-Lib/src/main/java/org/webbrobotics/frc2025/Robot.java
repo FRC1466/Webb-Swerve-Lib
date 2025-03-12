@@ -52,6 +52,8 @@ public class Robot extends LoggedRobot {
   private final Timer canErrorTimer = new Timer();
   private final Timer disabledTimer = new Timer();
 
+  Leds leds = new Leds();
+
   private final Alert canErrorAlert =
       new Alert("CAN errors detected, robot may not be controllable.", AlertType.kError);
   private final Alert lowBatteryAlert =
@@ -65,7 +67,7 @@ public class Robot extends LoggedRobot {
     robotContainer = new RobotContainer();
 
     // Start loading animation
-    Leds.loadingLights();
+    leds.loadingLights();
 
     // Record metadata
     Logger.recordMetadata("Robot", Constants.getRobot().toString());
@@ -230,7 +232,7 @@ public class Robot extends LoggedRobot {
         && disabledTimer.hasElapsed(lowBatteryDisabledTime)
         && lowBatteryCycleCount >= lowBatteryMinCycleCount) {
       lowBatteryAlert.set(true);
-      Leds.warningLights();
+      leds.warningLights();
     }
 
     // JIT alert

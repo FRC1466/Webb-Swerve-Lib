@@ -1,0 +1,21 @@
+[
+  {
+    "type": "java",
+    "name": "jar (in project Webb-Swerve-Lib)",
+    "extensions": [
+      {
+        "name": "Sim GUI",
+        "libName": "/Users/2028thao/Documents/GitHub/Webb-Swerve-Lib/Webb-Swerve-Lib/build/jni/release/libhalsim_gui.dylib",
+        "defaultEnabled": false
+      },
+      {
+        "name": "Use Real DriverStation",
+        "libName": "/Users/2028thao/Documents/GitHub/Webb-Swerve-Lib/Webb-Swerve-Lib/build/jni/release/libhalsim_ds_socket.dylib",
+        "defaultEnabled": false
+      }
+    ],
+    "environment": {},
+    "libraryDir": "/Users/2028thao/Documents/GitHub/Webb-Swerve-Lib/Webb-Swerve-Lib/build/jni/release",
+    "mainClassName": "org.webbrobotics.frc2025.Main"
+  }
+]

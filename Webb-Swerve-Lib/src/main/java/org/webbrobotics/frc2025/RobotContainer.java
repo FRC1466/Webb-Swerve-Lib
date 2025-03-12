@@ -44,6 +44,8 @@ public class RobotContainer {
   private Drive drive;
   private Vision vision;
 
+  Leds leds = new Leds();
+
   // Controllers
   private final CommandXboxController driver = new CommandXboxController(0);
   private final OverrideSwitches overrides = new OverrideSwitches(5);
@@ -164,7 +166,7 @@ public class RobotContainer {
         .onTrue(
             controllerRumbleCommand()
                 .withTimeout(0.5)
-                .alongWith(Commands.runOnce(() -> Leds.rainbowPartyLights()))
+                .alongWith(Commands.runOnce(() -> leds.rainbowPartyLights()))
                 .andThen(Commands.waitUntil(() -> false)));
     new Trigger(
             () ->
@@ -177,7 +179,7 @@ public class RobotContainer {
                 .andThen(Commands.waitSeconds(0.1))
                 .repeatedly()
                 .withTimeout(0.9)
-                .alongWith(Commands.runOnce(() -> Leds.rainbowPartyLights()))
+                .alongWith(Commands.runOnce(() -> leds.rainbowPartyLights()))
                 .andThen(Commands.waitUntil(() -> false)));
   }
 

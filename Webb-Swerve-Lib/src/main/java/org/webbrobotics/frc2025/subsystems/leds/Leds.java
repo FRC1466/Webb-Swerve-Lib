@@ -3,39 +3,72 @@
  
 package org.webbrobotics.frc2025.subsystems.leds;
 
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.motorcontrol.Spark;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import org.littletonrobotics.junction.Logger;
 
-public class Leds {
-
-  static Spark blinkin;
+public class Leds extends SubsystemBase {
+  private final Spark blinkin;
+  private final boolean isSimulation;
 
   public Leds() {
-    blinkin = new Spark(1);
+    isSimulation = RobotBase.isSimulation();
+
+    // Only create real hardware objects when not in simulation
+    if (!isSimulation) {
+      blinkin = new Spark(1);
+    } else {
+      // In simulation, just set to null but don't use it
+      blinkin = null;
+    }
   }
 
-  public static void coralLights() {
-    blinkin.set(.89);
-    Logger.recordOutput("Lights", "Coral");
+  public void loadingLights() {
+    // Check if we're in simulation mode before using hardware
+    if (!isSimulation && blinkin != null) {
+      blinkin.set(-0.05);
+      Logger.recordOutput("Lights", "Loading");
+    }
   }
 
-  public static void algaeLights() {
-    blinkin.set(.73);
-    Logger.recordOutput("Lights", "Algae");
+  // Other methods with similar checks
+  public void setPattern(double pattern) {
+    if (!isSimulation && blinkin != null) {
+      blinkin.set(pattern);
+    }
   }
 
-  public static void rainbowPartyLights() {
-    blinkin.set(-.97);
-    Logger.recordOutput("Lights", "Auto");
+  @Override
+  public void periodic() {
+    // Periodic code here
   }
 
-  public static void warningLights() {
-    blinkin.set(-0.17);
-    Logger.recordOutput("Lights", "Warning");
+  public void coralLights() {
+    if (!isSimulation && blinkin != null) {
+      blinkin.set(.89);
+      Logger.recordOutput("Lights", "Coral");
+    }
   }
 
-  public static void loadingLights() {
-    blinkin.set(-0.05);
-    Logger.recordOutput("Lights", "Loading");
+  public void algaeLights() {
+    if (!isSimulation && blinkin != null) {
+      blinkin.set(.73);
+      Logger.recordOutput("Lights", "Algae");
+    }
+  }
+
+  public void rainbowPartyLights() {
+    if (!isSimulation && blinkin != null) {
+      blinkin.set(-.97);
+      Logger.recordOutput("Lights", "Auto");
+    }
+  }
+
+  public void warningLights() {
+    if (!isSimulation && blinkin != null) {
+      blinkin.set(-0.17);
+      Logger.recordOutput("Lights", "Warning");
+    }
   }
 }

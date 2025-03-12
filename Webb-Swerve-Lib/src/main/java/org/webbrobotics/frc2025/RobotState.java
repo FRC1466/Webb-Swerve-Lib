@@ -60,7 +60,7 @@ public class RobotState {
 
   @Getter @Setter private OptionalDouble distanceToBranch = OptionalDouble.empty();
 
-  private RobotState() {
+  public RobotState() {
     for (int i = 0; i < 3; ++i) {
       qStdDevs.set(i, 0, Math.pow(odometryStateStdDevs.get(i, 0), 2));
     }
