@@ -138,7 +138,7 @@ task(replayWatch, type: JavaExec) {
 
 // Generate drive trajectories when building
 task(generateDriveTrajectories, dependsOn: "classes", type: JavaExec) {
-    mainClass = "org.littletonrobotics.frc2025.subsystems.drive.trajectory.GenerateTrajectories"
+    mainClass = "org.webbrobotics.frc2025.subsystems.drive.trajectory.GenerateTrajectories"
     classpath = sourceSets.main.runtimeClasspath
 }
 compileJava.finalizedBy generateDriveTrajectories

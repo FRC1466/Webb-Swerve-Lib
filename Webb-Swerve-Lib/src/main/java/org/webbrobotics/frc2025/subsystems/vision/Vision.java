@@ -20,6 +20,7 @@ import org.littletonrobotics.junction.Logger;
 import org.photonvision.EstimatedRobotPose;
 import org.photonvision.targeting.PhotonPipelineResult;
 import org.photonvision.targeting.PhotonTrackedTarget;
+import org.webbrobotics.frc2025.RobotState;
 
 /** Vision subsystem for vision. */
 public class Vision {
@@ -74,11 +75,22 @@ public class Vision {
           "Vision/" + cameraName + "/CameraTimeSeconds", result.getTimestampSeconds());
     }
 
-    // Get pose estimation
-    Optional<EstimatedRobotPose> poseEstimation = getEstimatedGlobalPose();
-
     // Log tracking data
     logSeenAprilTags();
+
+    Optional<EstimatedRobotPose> visionEst = getEstimatedGlobalPose();
+    if (visionEst.isPresent()) {
+      EstimatedRobotPose robotPose = visionEst.get();
+      Pose2d visionPose = robotPose.estimatedPose.toPose2d();
+      double timestamp = robotPose.timestampSeconds;
+
+      // Add the vision measurement to our state estimator
+      RobotState.getInstance().addVisionMeasurement(visionPose, timestamp);
+
+      // Log vision data
+      Logger.recordOutput("Vision/ProcessedPose", visionPose);
+      Logger.recordOutput("Vision/ProcessedTimestamp", timestamp);
+    }
   }
 
   /**

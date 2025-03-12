@@ -112,6 +112,28 @@ public class RobotState {
     // Any logging that might be needed can go here
   }
 
+  public void addVisionMeasurement(Pose2d visionPose, double timestamp) {
+    // Get odometry based pose at timestamp
+    var sample = poseBuffer.getSample(timestamp);
+    if (sample.isEmpty()) {
+      // exit if not there
+      return;
+    }
+
+    // sample --> odometryPose transform and backwards of that
+    var sampleToOdometryTransform = new Transform2d(sample.get(), odometryPose);
+    var odometryToSampleTransform = new Transform2d(odometryPose, sample.get());
+    // get old estimate by applying odometryToSample Transform
+    Pose2d estimateAtTime = estimatedPose.plus(odometryToSampleTransform);
+
+    // difference between estimate and vision pose
+    Transform2d transform = new Transform2d(estimateAtTime, visionPose);
+
+    // Recalculate current estimate by applying transform to old estimate
+    // then replaying odometry data
+    estimatedPose = estimateAtTime.plus(transform).plus(sampleToOdometryTransform);
+  }
+
   public record OdometryObservation(
       SwerveModulePosition[] wheelPositions, Optional<Rotation2d> gyroAngle, double timestamp) {}
 }

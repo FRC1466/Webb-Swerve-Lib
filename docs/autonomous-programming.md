@@ -1,239 +1,214 @@
 # Autonomous Programming
 
-This guide explains how to create autonomous routines with Webb-Swerve-Lib using generated trajectories.
+This guide explains how to create effective autonomous routines with Webb-Swerve-Lib using generated trajectories and WPILib's command-based programming.
 
-## Autonomous Basics
+## Autonomous Architecture
 
-Autonomous routines in Webb-Swerve-Lib use the WPILib command framework to sequence actions. A typical autonomous routine will:
+Webb-Swerve-Lib uses a command-based approach to autonomous programming, allowing you to:
 
-1. Follow one or more trajectories
-2. Execute game-specific actions (shooting, intaking, etc.)
-3. Respond to sensor inputs when needed
-4. Handle timing and coordination of subsystems
+1. Sequence multiple trajectories and actions
+2. Create reusable components for various game strategies
+3. Handle timing and parallel execution of subsystems
+4. Respond to sensor inputs during autonomous execution
+
+## Components of Autonomous Routines
+
+### DriveTrajectory Command
+
+The fundamental command for trajectory following is `DriveTrajectory`, which drives the robot along a specified path:
+
+```java
+public class DriveTrajectory extends Command {
+    private final Drive driveSubsystem;
+    private final HolonomicTrajectory trajectory;
+    private final PIDController xController;
+    private final PIDController yController;
+    private final PIDController rotationController;
+    
+    // Constructor and implementation details
+}
+```
+
+### Creating Autonomous Routines
+
+Autonomous routines are created by combining trajectory following with other game-specific actions:
+
+```java
+public class ExampleAuto extends SequentialCommandGroup {
+    public ExampleAuto(Drive driveSubsystem, IntakeSubsystem intakeSubsystem) {
+        // Load trajectories
+        HolonomicTrajectory driveToNoteTrajectory = new HolonomicTrajectory("driveToNote");
+        HolonomicTrajectory driveToSpeakerTrajectory = new HolonomicTrajectory("driveToSpeaker");
+        
+        // Add sequential commands
+        addCommands(
+            // Drive to game piece
+            new DriveTrajectory(driveSubsystem, driveToNoteTrajectory),
+            
+            // Intake game piece
+            new IntakeCommand(intakeSubsystem).withTimeout(1.0),
+            
+            // Drive to scoring position
+            new DriveTrajectory(driveSubsystem, driveToSpeakerTrajectory),
+            
+            // Score game piece
+            new ScoreCommand(intakeSubsystem)
+        );
+    }
+}
+```
 
 ## Loading and Using Trajectories
 
 Once you've [created and generated trajectories](creating-trajectories.md), you can use them in your autonomous routines:
 
 ```java
-public class ExampleAuto extends SequentialCommandGroup {
-    public ExampleAuto(Drive driveSubsystem, OtherSubsystem otherSubsystem) {
-        // Load the trajectory
-        HolonomicTrajectory driveToGoalTrajectory = new HolonomicTrajectory("driveToGoal");
-        
+// Loading a trajectory
+HolonomicTrajectory trajectory = new HolonomicTrajectory("trajectoryName");
+
+// Using the trajectory with a DriveTrajectory command
+DriveTrajectory driveCommand = new DriveTrajectory(driveSubsystem, trajectory);
+```
+
+## Autonomous Routine Structure
+
+### Simple Linear Sequence
+
+For a basic autonomous routine that executes steps in order:
+
+```java
+public class SimpleAutoRoutine extends SequentialCommandGroup {
+    public SimpleAutoRoutine(Drive driveSubsystem, OtherSubsystem otherSubsystem) {
         addCommands(
-            // Drive to goal
-            new DriveTrajectory(driveSubsystem, driveToGoalTrajectory),
+            // Reset robot pose to trajectory starting point
+            new InstantCommand(() -> driveSubsystem.setPose(
+                new Pose2d(1.5, 5.5, Rotation2d.fromDegrees(180))
+            )),
             
-            // Perform an action (e.g., score)
-            new ScoreCommand(otherSubsystem),
+            // Follow first trajectory
+            new DriveTrajectory(driveSubsystem, new HolonomicTrajectory("path1")),
             
-            // Drive to another position
-            new DriveTrajectory(driveSubsystem, new HolonomicTrajectory("driveToNextPosition"))
+            // Execute an action
+            new ActionCommand(otherSubsystem),
+            
+            // Follow second trajectory
+            new DriveTrajectory(driveSubsystem, new HolonomicTrajectory("path2"))
         );
     }
 }
 ```
 
-## Trajectory Following Using DriveTrajectory
+### Parallel Actions
 
-The `DriveTrajectory` command is the core component for following trajectories in autonomous:
-
-```java
-// Basic usage
-new DriveTrajectory(driveSubsystem, trajectory);
-
-// With mirroring (for opposite alliance)
-new DriveTrajectory(driveSubsystem, trajectory, true);
-
-// With custom pose supplier
-new DriveTrajectory(driveSubsystem, trajectory, customPoseSupplier, false);
-```
-
-### How DriveTrajectory Works
-
-The `DriveTrajectory` command:
-
-1. Resets controllers at initialization
-2. Samples the trajectory based on elapsed time
-3. Applies feedback corrections based on current robot pose
-4. Computes and sends velocity commands to the drive subsystem
-5. Continues until the trajectory duration is reached
-
-## Creating a Complete Autonomous Routine
-
-Here's a complete example of an autonomous routine that follows trajectories and interacts with other subsystems:
+To perform actions while driving:
 
 ```java
-public class ThreeScoreAuto extends SequentialCommandGroup {
-    public ThreeScoreAuto(Drive drive, Shooter shooter, Intake intake) {
+public class ParallelAutoRoutine extends SequentialCommandGroup {
+    public ParallelAutoRoutine(Drive driveSubsystem, ArmSubsystem armSubsystem) {
         addCommands(
-            // Start with an initial delay if needed
-            new WaitCommand(0.1),
+            // Reset pose
+            new InstantCommand(() -> driveSubsystem.setPose(
+                new Pose2d(1.5, 5.5, Rotation2d.fromDegrees(180))
+            )),
             
-            // Score preloaded game piece
-            new ScoreCommand(shooter),
-            
-            // Drive to pickup position
-            new DriveTrajectory(drive, new HolonomicTrajectory("driveToPickup")),
-            
-            // Run intake while continuing to drive
+            // Drive while positioning arm
             new ParallelCommandGroup(
-                new IntakeCommand(intake),
-                new DriveTrajectory(drive, new HolonomicTrajectory("driveWhileIntaking"))
+                new DriveTrajectory(driveSubsystem, new HolonomicTrajectory("approachTarget")),
+                new PositionArmCommand(armSubsystem, ArmPosition.SCORING)
             ),
             
-            // Return to scoring position
-            new DriveTrajectory(drive, new HolonomicTrajectory("returnToScore")),
-            
-            // Score second game piece
-            new ScoreCommand(shooter),
-            
-            // Repeat for third game piece...
-            new DriveTrajectory(drive, new HolonomicTrajectory("driveToSecondPickup")),
-            new IntakeCommand(intake),
-            new DriveTrajectory(drive, new HolonomicTrajectory("returnToScoreAgain")),
-            new ScoreCommand(shooter)
+            // Score game piece
+            new ScoreCommand(armSubsystem)
         );
     }
 }
 ```
 
-## Conditional Autonomous Logic
+### Conditional Execution
 
-For more complex autonomous routines that need to make decisions based on sensors or game state:
+For decision-making during autonomous:
 
 ```java
-public class ConditionalAuto extends SequentialCommandGroup {
-    public ConditionalAuto(Drive drive, Vision vision, Shooter shooter) {
+public class ConditionalAutoRoutine extends SequentialCommandGroup {
+    public ConditionalAutoRoutine(Drive driveSubsystem, VisionSubsystem visionSubsystem, 
+                                IntakeSubsystem intakeSubsystem) {
         addCommands(
-            // Initial trajectory
-            new DriveTrajectory(drive, new HolonomicTrajectory("initialPath")),
+            // Drive to a position where we can see targets
+            new DriveTrajectory(driveSubsystem, new HolonomicTrajectory("scanPosition")),
             
-            // Conditional command based on vision
+            // Decide what to do based on vision
             new ConditionalCommand(
                 // If target detected
                 new SequentialCommandGroup(
-                    new AimAtTargetCommand(drive, vision),
-                    new ShootCommand(shooter)
+                    new DriveTrajectory(driveSubsystem, new HolonomicTrajectory("approachTarget")),
+                    new ScoreCommand(intakeSubsystem)
                 ),
-                // If no target detected
-                new SequentialCommandGroup(
-                    new DriveTrajectory(drive, new HolonomicTrajectory("fallbackPath")),
-                    new ShootCommand(shooter)
-                ),
-                // Condition
-                vision::hasTarget
+                // If no target
+                new DriveTrajectory(driveSubsystem, new HolonomicTrajectory("fallbackPath")),
+                // Condition to evaluate
+                visionSubsystem::hasTarget
             )
         );
     }
 }
 ```
 
-## Alliance Color Handling
+## Alliance-Based Path Selection
 
-Autonomous routines often need to adapt based on alliance color. Webb-Swerve-Lib provides mirroring capabilities:
+Different alliances may need mirrored autonomous paths:
 
 ```java
-public Command getAutonomousCommand() {
-    HolonomicTrajectory trajectory = new HolonomicTrajectory("trajectoryName");
+public class AllianceAwareAutoRoutine extends SequentialCommandGroup {
+    public AllianceAwareAutoRoutine(Drive driveSubsystem, AllianceColor alliance) {
+        // Select the appropriate path based on alliance
+        String pathName = (alliance == AllianceColor.RED) ? 
+            "redSidePathToScore" : "blueSidePathToScore";
+        
+        addCommands(
+            // Reset pose with appropriate alliance starting position
+            new InstantCommand(() -> driveSubsystem.setPose(
+                getAllianceStartingPose(alliance)
+            )),
+            
+            // Execute the alliance-specific trajectory
+            new DriveTrajectory(driveSubsystem, new HolonomicTrajectory(pathName))
+        );
+    }
     
-    // Mirror the trajectory if on the blue alliance
-    boolean mirror = DriverStation.getAlliance().isPresent() && 
-                    DriverStation.getAlliance().get() == Alliance.Blue;
-    
-    return new DriveTrajectory(drive, trajectory, mirror);
+    private Pose2d getAllianceStartingPose(AllianceColor alliance) {
+        if (alliance == AllianceColor.RED) {
+            return new Pose2d(15.0, 5.5, Rotation2d.fromDegrees(0));
+        } else {
+            return new Pose2d(1.5, 5.5, Rotation2d.fromDegrees(180));
+        }
+    }
 }
 ```
 
-## Integrating with Field Elements
+## Autonomous Mode Selection
 
-To interact with field elements during autonomous:
-
-1. **Define field element positions in FieldConstants:**
-
-   ```java
-   public class FieldConstants {
-       public static final double fieldLength = 16.54;
-       public static final double fieldWidth = 8.21;
-       
-       public static class ScoringLocations {
-           public static final Pose2d highGoal = new Pose2d(15.2, 4.1, Rotation2d.fromDegrees(0));
-           // Other field elements...
-       }
-   }
-   ```
-
-2. **Use these constants in trajectory creation:**
-
-   ```java
-   // In DriveTrajectories.java
-   paths.put(
-       "driveToScore",
-       List.of(
-           PathSegment.newBuilder()
-               .addPoseWaypoint(startPose)
-               .addPoseWaypoint(
-                   // Position slightly in front of the goal
-                   new Pose2d(
-                       FieldConstants.ScoringLocations.highGoal.getX() - 0.5,
-                       FieldConstants.ScoringLocations.highGoal.getY(),
-                       FieldConstants.ScoringLocations.highGoal.getRotation()
-                   )
-               )
-               .build()
-       )
-   );
-   ```
-
-## Performance Tuning
-
-To optimize autonomous performance:
-
-1. **PID Tuning:**
-   ```java
-   // Tune these values for your specific robot
-   private static final LoggedTunableNumber linearkP = new LoggedTunableNumber("DriveTrajectory/LinearkP", 8.0);
-   private static final LoggedTunableNumber linearkD = new LoggedTunableNumber("DriveTrajectory/LinearkD", 0.0);
-   private static final LoggedTunableNumber thetakP = new LoggedTunableNumber("DriveTrajectory/ThetakP", 4.0);
-   private static final LoggedTunableNumber thetakD = new LoggedTunableNumber("DriveTrajectory/ThetakD", 0.0);
-   ```
-
-2. **Start with lower velocities** and gradually increase as you validate your trajectories.
-
-3. **Log and visualize performance** using AdvantageScope to identify issues.
-
-## Custom Heading Control
-
-For advanced autonomous routines where you need to control the heading independently of the path:
-
-```java
-public Command createAutoCommand() {
-    DriveTrajectory trajectoryCommand = new DriveTrajectory(drive, trajectory);
-    
-    // Override heading to face a specific direction (e.g., toward a target)
-    trajectoryCommand.setOverrideRotation(Optional.of(Rotation2d.fromDegrees(90)));
-    
-    return trajectoryCommand;
-}
-```
-
-## Multi-Path Autonomous Selection
-
-For competition, it's useful to have multiple autonomous routines selectable from the dashboard:
+Using the WPILib SendableChooser to select autonomous routines:
 
 ```java
 public class RobotContainer {
     private final SendableChooser<Command> autoChooser = new SendableChooser<>();
     
     public RobotContainer() {
+        // Configure subsystems, bindings, etc.
+        
         // Configure autonomous options
-        autoChooser.setDefaultOption("Two Score", new TwoScoreAuto(drive, shooter, intake));
-        autoChooser.addOption("Three Score", new ThreeScoreAuto(drive, shooter, intake));
-        autoChooser.addOption("Defense", new DefenseAuto(drive));
+        configureAutonomousChooser();
+    }
+    
+    private void configureAutonomousChooser() {
+        // Add options to the chooser
+        autoChooser.setDefaultOption("2 Ball Auto", new TwoBallAuto(drive, intake, shooter));
+        autoChooser.addOption("3 Ball Auto", new ThreeBallAuto(drive, intake, shooter));
+        autoChooser.addOption("Defense Auto", new DefenseAuto(drive));
+        autoChooser.addOption("Do Nothing", new InstantCommand());
         
         // Put the chooser on the dashboard
-        SmartDashboard.putData("Auto Chooser", autoChooser);
+        SmartDashboard.putData("Auto Mode", autoChooser);
     }
     
     public Command getAutonomousCommand() {
@@ -242,30 +217,173 @@ public class RobotContainer {
 }
 ```
 
-## Testing and Debugging
+## PID Tuning for Trajectory Following
 
-For effective testing of autonomous routines:
+The `DriveTrajectory` command uses PID controllers for tracking. These need proper tuning:
 
-1. **Simulation First:**
-   - Test trajectories in simulation before running on the robot
-   - Visualize paths and robot position using AdvantageScope
+```java
+// Example PID values for trajectory following
+public static final double kPTranslation = 5.0;
+public static final double kITranslation = 0.0;
+public static final double kDTranslation = 0.0;
 
-2. **Incremental Testing:**
-   - Test one trajectory segment at a time
-   - Validate each action before combining them
+public static final double kPRotation = 5.0;
+public static final double kIRotation = 0.0;
+public static final double kDRotation = 0.1;
+```
 
-3. **Debugging Tools:**
-   - Use `Logger.recordOutput()` to log key data points
-   - Add "checkpoints" in autonomous code to identify where issues occur
+### Tuning Process
 
-4. **Common Issues:**
-   - Initial pose mismatch (ensure robot starts at the expected position)
-   - Trajectory following errors (adjust PID values or constraints)
-   - Subsystem timing issues (add small delays or use proper command chaining)
+1. **Start with Translation**: Tune translational controllers first
+   - Increase kP until the robot follows the path with minimal lag
+   - Add small kD if oscillation occurs
+   - Add minimal kI only if steady-state error persists
+
+2. **Then Tune Rotation**: Tune the rotational controller
+   - Increase kP until rotation tracking is responsive
+   - Add kD to reduce oscillation
+   - Rotation typically needs higher damping (kD)
+
+## Teleop to Autonomous Transitions
+
+For smooth competition play, handle transitions between teleop and autonomous:
+
+```java
+public class Robot extends TimedRobot {
+    private Command autonomousCommand;
+    private RobotContainer robotContainer;
+    
+    @Override
+    public void autonomousInit() {
+        // Get the selected autonomous command
+        autonomousCommand = robotContainer.getAutonomousCommand();
+        
+        // Schedule the autonomous command
+        if (autonomousCommand != null) {
+            autonomousCommand.schedule();
+        }
+    }
+    
+    @Override
+    public void teleopInit() {
+        // End autonomous command when teleop starts
+        if (autonomousCommand != null) {
+            autonomousCommand.cancel();
+        }
+        
+        // Set brake mode for teleop
+        robotContainer.getDrive().setBrakeMode(true);
+    }
+}
+```
+
+## Event Markers
+
+Webb-Swerve-Lib supports event markers for triggering actions at specific points along trajectories:
+
+```java
+// Create a trajectory with event markers
+PathSegment.newBuilder()
+    .addPoseWaypoint(new Pose2d(0, 0, new Rotation2d(0)))
+    .addTranslationWaypoint(new Translation2d(1, 1))
+    .addEvent("startIntake", 0.25) // Event at 25% along the path
+    .addEvent("prepareToScore", 0.75) // Event at 75% along the path
+    .addPoseWaypoint(new Pose2d(2, 2, Rotation2d.fromDegrees(90)))
+    .build();
+
+// Using event markers in an autonomous routine
+public class EventMarkerAuto extends SequentialCommandGroup {
+    public EventMarkerAuto(Drive driveSubsystem, IntakeSubsystem intakeSubsystem) {
+        HolonomicTrajectory trajectory = new HolonomicTrajectory("pathWithEvents");
+        
+        // Create the drive command
+        DriveTrajectory driveCommand = new DriveTrajectory(driveSubsystem, trajectory);
+        
+        // Configure event handlers
+        driveCommand.addEventHandler("startIntake", 
+            new InstantCommand(() -> intakeSubsystem.setIntakePower(1.0)));
+            
+        driveCommand.addEventHandler("prepareToScore", 
+            new InstantCommand(() -> intakeSubsystem.prepareToScore()));
+            
+        addCommands(driveCommand);
+    }
+}
+```
+
+## Testing and Debugging Autonomous
+
+### Visualization Tools
+
+Webb-Swerve-Lib works with AdvantageScope for visualization:
+
+```java
+// In periodic() method of your Drive subsystem or command
+Logger.recordOutput("Trajectory/DesiredPose", currentTrajectoryPose);
+Logger.recordOutput("Trajectory/ActualPose", robotState.getEstimatedPose());
+Logger.recordOutput("Trajectory/Error", calculatePoseError());
+```
+
+### Iterative Testing Process
+
+1. **Start Simple**: Test basic trajectories first
+2. **Test in Simulation**: Verify trajectories work in simulation before deploying
+3. **Real-World Testing**: Test on the actual field, making adjustments as needed
+4. **Measure Accuracy**: Record and analyze position error
+5. **Tune Parameters**: Adjust PID values based on real-world performance
+
+## Common Autonomous Issues
+
+| Issue | Symptom | Cause | Solution |
+|-------|---------|-------|----------|
+| Path Not Following | Robot deviates from intended path | Insufficient PID values | Increase kP for translation and rotation |
+| Oscillation | Robot weaves along path | PID values too aggressive | Reduce kP and/or increase kD |
+| Pose Reset Issues | Robot starts in wrong position | Incorrect initial pose reset | Verify setPose() call at start of auto |
+| Timing Problems | Actions happen too early/late | Event timing issues | Use event markers instead of time-based sequencing |
+| Alliance Mismatch | Path designed for wrong alliance | Missing alliance-specific logic | Implement alliance-aware path selection |
+
+## Field-Centric Autonomous
+
+For strategies that need to be robust across starting positions:
+
+```java
+public class FieldCentricAuto extends SequentialCommandGroup {
+    public FieldCentricAuto(Drive driveSubsystem, FieldElement targetElement) {
+        // Get the current robot position
+        Pose2d startingPose = RobotState.getInstance().getEstimatedPose();
+        
+        // Calculate path to target element
+        HolonomicTrajectory pathToTarget = 
+            TrajectoryGenerator.generatePathToTarget(startingPose, targetElement.getPose());
+        
+        addCommands(
+            // Follow the dynamically generated path
+            new DriveTrajectory(driveSubsystem, pathToTarget)
+        );
+    }
+}
+```
+
+## Autonomous Strategy Planning
+
+When designing autonomous routines, consider:
+
+1. **Scoring Priority**: Decide which game elements to prioritize
+2. **Time Management**: Balance scoring vs. mobility points
+3. **Alliance Coordination**: Design routines that complement alliance partners
+4. **Robustness**: Plan for potential failures or unexpected obstacles
+5. **Endgame Position**: Finish autonomous in a favorable position for teleop
+
+## Best Practices
+
+1. **Test Thoroughly**: Validate autonomous routines in various starting conditions
+2. **Build Modular Components**: Create reusable command sequences
+3. **Document Strategies**: Keep notes on which routines work best for different alliances/partners
+4. **Practice Driver Takeover**: Ensure drivers can smoothly take over from any autonomous ending
+5. **Time Your Routines**: Know exactly how long each routine takes to execute
 
 ## Next Steps
 
-Now that you understand how to create autonomous routines:
-- Explore the [API reference](api-reference.md) for advanced features
-- See [troubleshooting tips](troubleshooting.md) if you encounter issues
-- Learn about [advanced features and optimization](advanced-features.md)
+- Learn about [odometry and localization](odometry-localization.md)
+- Understand [common issues](common-issues.md) in swerve drive systems
+- Study the [API reference](api-reference.md) for detailed class documentation

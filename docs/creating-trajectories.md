@@ -1,15 +1,25 @@
 # Creating Trajectories
 
-This guide explains how to create, generate, and use trajectories with Webb-Swerve-Lib for autonomous robot movement.
+This guide explains how to create, generate, and use trajectories with Webb-Swerve-Lib for autonomous robot movement, with detailed examples and common troubleshooting steps.
 
 ## Trajectory Basics
 
 A trajectory in Webb-Swerve-Lib is composed of:
+
 - A series of waypoints (positions and headings)
 - Constraints (velocities, accelerations, etc.)
 - Motion profiling for smooth movement
 
 The library uses these elements to generate optimized paths that your robot can follow with precision.
+
+## Trajectory System Components
+
+The Webb-Swerve-Lib trajectory system consists of several components:
+
+1. **PathSegment**: The building block of trajectories that specifies waypoints and constraints
+2. **HolonomicTrajectory**: A complete trajectory object that includes timing information
+3. **DriveTrajectory**: A command that uses a PID controller to follow a trajectory
+4. **DriveTrajectories**: A class that defines and manages available trajectories
 
 ## Defining Trajectories
 
@@ -38,194 +48,198 @@ For more complex paths with multiple waypoints and constraints:
 paths.put(
     "complexTrajectory",
     List.of(
-        // First segment
+        // First segment - leave starting area
         PathSegment.newBuilder()
-            .addPoseWaypoint(new Pose2d(0, 0, new Rotation2d(0)))
-            .addTranslationWaypoint(new Translation2d(1, 0.5)) // Intermediate point (position only)
-            .addPoseWaypoint(new Pose2d(2, 1, Rotation2d.fromDegrees(45)))
-            .setMaxVelocity(2.0) // Limit max velocity to 2.0 m/s for this segment
+            .addPoseWaypoint(new Pose2d(1.0, 1.0, Rotation2d.fromDegrees(0))) // Starting pose
+            .addPoseWaypoint(new Pose2d(3.0, 1.0, Rotation2d.fromDegrees(0))) // Intermediate pose
+            .setMaxVelocity(2.0) // m/s
+            .setMaxAcceleration(1.5) // m/s^2
+            .setReversed(false) // Drive forward
             .build(),
-        
-        // Second segment (connected to the first)
+            
+        // Second segment - approach scoring position
         PathSegment.newBuilder()
-            .addPoseWaypoint(new Pose2d(2, 1, Rotation2d.fromDegrees(45))) // Starting where first segment ends
-            .addPoseWaypoint(new Pose2d(3, 3, Rotation2d.fromDegrees(90)))
-            .setMaxVelocity(1.5) // Different constraints for this segment
-            .setMaxOmega(Math.PI) // Limit rotation rate
+            .addPoseWaypoint(new Pose2d(3.0, 1.0, Rotation2d.fromDegrees(0))) // Continue from last pose
+            .addHeadingWaypoint(0.5, Rotation2d.fromDegrees(45)) // Turn during movement
+            .addPoseWaypoint(new Pose2d(4.0, 2.0, Rotation2d.fromDegrees(90))) // Final pose
+            .setMaxVelocity(1.0) // Slower for precision
+            .setMaxAcceleration(0.8)
             .build()
     )
 );
 ```
 
-### Helper Methods
+### Waypoint Types
 
-The `TrajectoryGenerationHelpers` class provides utility methods to simplify path creation:
+The library supports several types of waypoints:
 
-```java
-// Adding a pose waypoint
-PathSegment.Builder segmentBuilder = PathSegment.newBuilder();
-segmentBuilder.addPoseWaypoint(new Pose2d(1, 2, new Rotation2d(Math.PI/2)));
-
-// Or using the extension method
-segmentBuilder = segmentBuilder.addPoseWaypoint(new Pose2d(1, 2, new Rotation2d(Math.PI/2)));
-
-// Adding a waypoint with just position (no heading)
-segmentBuilder = segmentBuilder.addTranslationWaypoint(new Translation2d(2, 3));
-
-// Continuing from a previous trajectory
-segmentBuilder = segmentBuilder.addContinuationWaypoint(previousTrajectory);
-```
-
-## Connecting Trajectories
-
-You can chain trajectories for more complex autonomous routines:
-
-```java
-// Define a dependent trajectory
-suppliedPaths.add(
-    (completedPaths) -> {
-        // Only generate this path if "firstPath" has been processed
-        if (!completedPaths.contains("firstPath")) {
-            return null;
-        }
-        
-        Map<String, List<PathSegment>> result = new HashMap<>();
-        result.put(
-            "secondPath",
-            List.of(
-                PathSegment.newBuilder()
-                    // Start from the end of the first path
-                    .addWaypoints(getLastWaypoint("firstPath"))
-                    .addPoseWaypoint(new Pose2d(4, 2, Rotation2d.fromDegrees(180)))
-                    .build()
-            )
-        );
-        return result;
-    }
-);
-```
-
-## Velocity Constraints
-
-Control the speed of your robot along the path:
-
-```java
-PathSegment.newBuilder()
-    .addPoseWaypoint(startPose)
-    .addPoseWaypoint(endPose)
-    .setMaxVelocity(2.0) // Maximum linear velocity in m/s
-    .setMaxOmega(Math.PI) // Maximum angular velocity in rad/s
-    .build()
-```
-
-For specific velocities at waypoints:
-
-```java
-Waypoint.Builder waypointBuilder = Waypoint.newBuilder()
-    .withPose(pose)
-    .withLinearVelocity(new Translation2d(1.0, 0.0)); // X velocity of 1.0 m/s, Y velocity of 0.0 m/s
-
-// Or set to zero velocity at endpoint
-waypointBuilder.setZeroVelocity();
-```
-
-## Generating Trajectory Files
-
-After defining your trajectories in `DriveTrajectories.java`, you need to generate the trajectory files:
-
-1. **Run the generator:**
-
-   ```bash
-   ./gradlew runTrajectoryGeneration
+1. **Pose Waypoints**: Specify position (x, y) and heading
+   ```java
+   .addPoseWaypoint(new Pose2d(x, y, rotation))
    ```
 
-   This command runs the `GenerateTrajectories` class which:
-   - Creates a vehicle model based on your robot's physical characteristics
-   - Connects to the trajectory generation service
-   - Processes all trajectory definitions
-   - Generates optimized paths
-   - Saves the paths as `.pathblob` files in `src/main/deploy/trajectories/`
-
-2. **Deploy the trajectories:**
-
-   ```bash
-   ./gradlew deploy
+2. **Translation Waypoints**: Specify position only, no heading constraint
+   ```java
+   .addTranslationWaypoint(new Translation2d(x, y))
    ```
 
-   This command deploys the trajectory files to your robot.
+3. **Heading Waypoints**: Specify a heading at a particular point along the path
+   ```java
+   .addHeadingWaypoint(t, rotation) // t is a value from 0.0 to 1.0
+   ```
 
-## Using Trajectories in Autonomous Routines
+## Trajectory Constraints
 
-Once generated, you can use the trajectories in your autonomous routines:
+Control the behavior of your trajectory with constraints:
 
 ```java
-public Command getAutonomousCommand() {
-    // Load the trajectory
-    HolonomicTrajectory trajectory = new HolonomicTrajectory("yourTrajectoryName");
+.setMaxVelocity(2.0) // Maximum velocity in m/s
+.setMaxAcceleration(1.5) // Maximum acceleration in m/s²
+.setStartVelocity(0.0) // Starting velocity
+.setEndVelocity(0.0) // Ending velocity
+.setReversed(false) // Drive forward (true for reverse)
+```
+
+### Common Constraint Values
+
+| Robot Type | Max Velocity (m/s) | Max Acceleration (m/s²) |
+|------------|-------------------|------------------------|
+| Light      | 7 - 10            | 2.5 - 3.5              |
+| Medium     | 5 - 7             | 1.5 - 2.5              |
+| Heavy      | 3.5 - 5           | 0.8 - 1.5              |
+
+> **Note**: These are starting points. Always test and tune for your specific robot.
+
+## Generating Trajectories
+
+Once you've defined your trajectories, you need to generate them:
+
+```java
+// In your DriveTrajectories.java class
+public DriveTrajectories() {
+    // Define trajectories in the paths map
+    defineTrajectories();
     
-    // Create a command to follow the trajectory
-    return new DriveTrajectory(driveSubsystem, trajectory);
+    // Generate all trajectories
+    paths.forEach((name, segments) -> {
+        trajectories.put(name, generateTrajectory(segments));
+    });
+}
+
+private HolonomicTrajectory generateTrajectory(List<PathSegment> segments) {
+    // Implementation depends on the trajectory generation method
+    // This is handled internally by the library
 }
 ```
 
-## Field Coordinates and Waypoint Positioning
+## Using Trajectories in Autonomous Commands
 
-It's important to understand the field coordinate system:
+Once trajectories are generated, you can use them in autonomous commands:
 
-- Origin (0,0) is at the bottom-left corner of the field
-- X-axis points away from your alliance wall
-- Y-axis points to the left when standing at your alliance wall
-- Rotations are measured counter-clockwise from the X-axis
+```java
+public class SampleAutoRoutine extends SequentialCommandGroup {
+    public SampleAutoRoutine(Drive driveSubsystem, OtherSubsystem otherSubsystem) {
+        // Load the trajectory
+        HolonomicTrajectory driveToGoalTrajectory = new HolonomicTrajectory("driveToGoal");
+        
+        addCommands(
+            // Drive to goal position
+            new DriveTrajectory(driveSubsystem, driveToGoalTrajectory),
+            
+            // Perform an action (e.g., score)
+            new ScoreCommand(otherSubsystem),
+            
+            // Drive to another position
+            new DriveTrajectory(driveSubsystem, new HolonomicTrajectory("driveToNextPosition"))
+        );
+    }
+}
+```
 
-Positioning waypoints effectively:
+## Advanced Techniques
 
-1. Use field landmarks as reference points
-2. Account for the robot's dimensions:
-   ```java
-   // Position robot center 1 meter from a wall
-   new Pose2d(1.0 + robotLength/2, y, rotation)
-   ```
+### Adding Intermediate Waypoints
 
-3. Use the `FieldConstants` class for predefined field positions
+For smoother paths, add intermediate waypoints:
 
-## Tips for Effective Trajectory Creation
+```java
+PathSegment.newBuilder()
+    .addPoseWaypoint(new Pose2d(1.0, 1.0, new Rotation2d(0)))
+    .addTranslationWaypoint(new Translation2d(1.5, 1.2)) // Intermediate point
+    .addTranslationWaypoint(new Translation2d(2.0, 1.5)) // Another intermediate point
+    .addPoseWaypoint(new Pose2d(3.0, 2.0, Rotation2d.fromDegrees(45)))
+    .build()
+```
 
-1. **Start Simple**
-   - Create basic trajectories first
-   - Test and validate before adding complexity
+### Creating Composite Paths
 
-2. **Smooth Paths**
-   - Add intermediate waypoints to avoid sharp turns
-   - Use appropriate velocity constraints for different segments
+For complex maneuvers, combine multiple path segments:
 
-3. **Testing and Iteration**
-   - Visualize trajectories in simulation
-   - Start with slower velocities and gradually increase
-   - Test on open parts of the field before tight spaces
+```java
+List<PathSegment> complexPath = new ArrayList<>();
 
-4. **Common Patterns**
-   - Create reusable patterns for common movements
-   - Build a library of trajectory segments
+// Add first segment (drive forward)
+complexPath.add(PathSegment.newBuilder()
+    .addPoseWaypoint(start)
+    .addPoseWaypoint(intermediate)
+    .setMaxVelocity(2.0)
+    .build());
 
-## Debugging Trajectories
+// Add second segment (turn and approach)
+complexPath.add(PathSegment.newBuilder()
+    .addPoseWaypoint(intermediate)
+    .addHeadingWaypoint(0.5, Rotation2d.fromDegrees(45))
+    .addPoseWaypoint(target)
+    .setMaxVelocity(1.0)
+    .build());
 
-If you encounter issues with trajectories:
+paths.put("complexManeuver", complexPath);
+```
 
-1. **Visualization**
-   - Use the `Trajectory/TrajectoryPoses` logged output to visualize the path in AdvantageScope
+## Visualizing and Testing Trajectories
 
-2. **Common Problems**
-   - Check waypoint coordinates and orientations
-   - Ensure constraints are reasonable
-   - Verify dependency chain for supplied paths
+The library provides tools to visualize your trajectories:
 
-3. **Advanced Debugging**
-   - Look at individual segments and state transitions
-   - Examine velocity and acceleration profiles
+1. **AdvantageScope**: View generated paths in AdvantageScope for verification
+2. **Field2d**: Use the Field2d widget in Shuffleboard to see paths during testing
+3. **Logging**: Enable trajectory logging to analyze execution
+
+```java
+// Log the current trajectory for visualization
+Logger.recordOutput("Autonomous/CurrentTrajectory", currentTrajectory);
+```
+
+## Common Issues and Solutions
+
+| Issue | Possible Cause | Solution |
+|-------|---------------|----------|
+| Robot doesn't follow path | Incorrect PID values | Tune PID constants for your robot |
+| Path is too aggressive | Constraints too loose | Reduce max velocity/acceleration |
+| Robot overshoots targets | Momentum not accounted for | Add end velocity constraints |
+| Jerky movement | Not enough waypoints | Add intermediate waypoints for smoother curves |
+| Robot doesn't face correct direction | Missing heading waypoints | Add explicit heading waypoints |
+
+### Troubleshooting Trajectory Following
+
+If your robot isn't following trajectories correctly:
+
+1. **Check Odometry**: Ensure your robot's position tracking is accurate
+2. **Visualize Path**: Use AdvantageScope to compare intended vs. actual path
+3. **Tune Controllers**: Adjust the PID controllers that follow the trajectory
+4. **Check Constraints**: Make sure velocity and acceleration limits are appropriate
+5. **Test Incrementally**: Start with simple paths before trying complex ones
+
+## Best Practices
+
+1. **Start Simple**: Begin with straight-line paths before adding complexity
+2. **Use Heading Waypoints**: Explicitly define robot orientation at key points
+3. **Test in Sim**: Test trajectories in simulation before deploying to the robot
+4. **Iterate**: Refine trajectories based on real-world testing
+5. **Document**: Keep notes on what works and what doesn't for your specific robot
 
 ## Next Steps
 
 Now that you understand how to create trajectories:
 - Learn about [autonomous programming](autonomous-programming.md)
 - See the [API reference](api-reference.md) for more details
-- Check out [troubleshooting](troubleshooting.md) if you encounter issues
+- Check out [troubleshooting](common-issues.md) if you encounter issues

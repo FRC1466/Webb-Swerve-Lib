@@ -51,8 +51,6 @@ public class RobotContainer {
 
   private final Alert driverDisconnected =
       new Alert("Driver controller disconnected (port 0).", AlertType.kWarning);
-  private final Alert operatorDisconnected =
-      new Alert("Operator controller disconnected (port 1).", AlertType.kWarning);
   private final Alert overrideDisconnected =
       new Alert("Override controller disconnected (port 5).", AlertType.kInfo);
   private final LoggedNetworkNumber endgameAlert1 =
@@ -206,6 +204,6 @@ public class RobotContainer {
   }
 
   public Command getAutonomousCommand() {
-    return Commands.print("No autonomous command configured");
+    return Commands.print(autoChooser.get() != null ? "Selected Auto" : "No Auto Selected");
   }
 }
