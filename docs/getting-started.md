@@ -13,37 +13,14 @@ This guide will walk you through the initial setup and configuration of the Webb
 
 ## Installation
 
-### Option 1: Add as Git Submodule (Recommended)
+### Option 1: Copy the entire file structure and build off it
 
 1. In your robot project's root directory, run:
    ```bash
-   git submodule add https://github.com/FRC1466/Webb-Swerve-Lib.git
+   git clone https://github.com/FRC1466/Webb-Swerve-Lib.git
    ```
 
-2. Update your `settings.gradle` file to include:
-   ```gradle
-   include ':Webb-Swerve-Lib'
-   ```
-
-3. Add the dependency to your `build.gradle` file:
-   ```gradle
-   dependencies {
-       implementation project(':Webb-Swerve-Lib')
-       // Your other dependencies
-   }
-   ```
-
-### Option 2: Add as a Library JAR
-
-1. Download the latest release JAR from the [GitHub releases page](https://github.com/FRC1466/Webb-Swerve-Lib/releases)
-2. Add the JAR to your project's lib folder
-3. Update your `build.gradle` to include it as a dependency:
-   ```gradle
-   dependencies {
-       implementation files('lib/Webb-Swerve-Lib.jar')
-       // Your other dependencies
-   }
-   ```
+### Option 2: Add as a Vendor Extension :: WIP
 
 ## Basic Project Structure
 
@@ -54,8 +31,9 @@ YourRobotProject/
 ├── src/
 │   └── main/
 │       └── java/
-│           └── frc/
-│               └── robot/
+│           └── org/
+│               └── webbrobotics/
+│                  └── frc2025/
 │                   ├── Constants.java
 │                   ├── RobotContainer.java
 │                   ├── Main.java
@@ -64,33 +42,13 @@ YourRobotProject/
 │                       └── drive/
 │                           ├── DriveConstants.java
 │                           └── Drive.java
-└── Webb-Swerve-Lib/ (If using submodule approach)
 ```
 
 ## Initial Setup
 
 1. Create a `DriveConstants.java` file in your project, similar to the one in Webb-Swerve-Lib but customized for your robot's physical parameters.
 
-2. Setup your gyroscope implementation:
-   ```java
-   // Example using Pigeon2
-   public class GyroIOPigeon2 implements GyroIO {
-     private final Pigeon2 pigeon;
-     
-     public GyroIOPigeon2() {
-       pigeon = new Pigeon2(DriveConstants.PigeonConstants.id);
-       pigeon.getConfigurator().apply(new Pigeon2Configuration());
-       pigeon.setYaw(0.0);
-     }
-     
-     @Override
-     public void updateInputs(GyroIOInputs inputs) {
-       inputs.connected = pigeon.getUpTime().getValue() > 0.0;
-       inputs.yawPosition = Rotation2d.fromDegrees(pigeon.getYaw().getValue());
-       inputs.yawVelocityRadPerSec = Units.degreesToRadians(pigeon.getAngularVelocityZWorld().getValue());
-     }
-   }
-   ```
+2. Setup your gyroscope implementation
 
 3. Define your swerve module configurations in `DriveConstants.java`:
    ```java
