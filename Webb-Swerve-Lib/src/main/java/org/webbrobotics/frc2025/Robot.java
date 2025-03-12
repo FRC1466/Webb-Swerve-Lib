@@ -3,11 +3,23 @@
  
 package org.webbrobotics.frc2025;
 
+import edu.wpi.first.hal.AllianceStationID;
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.IterativeRobotBase;
+import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
+import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.Threads;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.Watchdog;
+import edu.wpi.first.wpilibj.simulation.DriverStationSim;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
-
 import org.littletonrobotics.junction.AutoLogOutputManager;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
@@ -23,21 +35,6 @@ import org.webbrobotics.frc2025.util.NTClientLogger;
 import org.webbrobotics.frc2025.util.PhoenixUtil;
 import org.webbrobotics.frc2025.util.SystemTimeValidReader;
 import org.webbrobotics.frc2025.util.VirtualSubsystem;
-
-import edu.wpi.first.hal.AllianceStationID;
-import edu.wpi.first.wpilibj.Alert;
-import edu.wpi.first.wpilibj.Alert.AlertType;
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.IterativeRobotBase;
-import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
-import edu.wpi.first.wpilibj.RobotController;
-import edu.wpi.first.wpilibj.Threads;
-import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.Watchdog;
-import edu.wpi.first.wpilibj.simulation.DriverStationSim;
-import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
 
 public class Robot extends LoggedRobot {
   private static final double loopOverrunWarningTimeout = 0.2;
@@ -57,13 +54,13 @@ public class Robot extends LoggedRobot {
   private final Timer canivoreErrorTimer = new Timer();
   private final Timer disabledTimer = new Timer();
 
-    private final Alert canErrorAlert =
+  private final Alert canErrorAlert =
       new Alert("CAN errors detected, robot may not be controllable.", AlertType.kError);
-    private final Alert lowBatteryAlert =
+  private final Alert lowBatteryAlert =
       new Alert(
           "Battery voltage is very low, consider turning off the robot or replacing the battery.",
           AlertType.kWarning);
-    private final Alert jitAlert =
+  private final Alert jitAlert =
       new Alert("Please wait to enable, JITing in progress.", AlertType.kWarning);
 
   public Robot() {
@@ -248,15 +245,15 @@ public class Robot extends LoggedRobot {
     LoggedTracer.record("RobotPeriodic");
   }
 
-    /** Returns whether we should wait to enable because JIT optimizations are in progress. */
-    public static boolean isJITing() {
-      return Timer.getTimestamp() < 45.0;
-    }
+  /** Returns whether we should wait to enable because JIT optimizations are in progress. */
+  public static boolean isJITing() {
+    return Timer.getTimestamp() < 45.0;
+  }
 
   /** This function is called once when the robot is disabled. */
   @Override
   public void disabledInit() {}
-  
+
   /** This function is called periodically when disabled. */
   @Override
   public void disabledPeriodic() {}
@@ -289,8 +286,7 @@ public class Robot extends LoggedRobot {
 
   /** This function is called once when test mode is enabled. */
   @Override
-  public void testInit() {
-  }
+  public void testInit() {}
 
   /** This function is called periodically during test mode. */
   @Override

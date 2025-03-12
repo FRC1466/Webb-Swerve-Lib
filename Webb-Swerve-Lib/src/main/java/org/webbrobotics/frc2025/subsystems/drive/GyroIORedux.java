@@ -1,10 +1,6 @@
-// Copyright (c) 2025 FRC 6328
-// http://github.com/Mechanical-Advantage
-//
-// Use of this source code is governed by an MIT-style
-// license that can be found in the LICENSE file at
-// the root directory of this project.
-
+// Copyright (c) 2025 FRC Team 1466
+// https://github.com/FRC1466
+ 
 package org.webbrobotics.frc2025.subsystems.drive;
 
 import com.reduxrobotics.sensors.canandgyro.Canandgyro;

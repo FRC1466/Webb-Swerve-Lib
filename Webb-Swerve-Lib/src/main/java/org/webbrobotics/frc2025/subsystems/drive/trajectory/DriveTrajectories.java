@@ -1,10 +1,6 @@
 // Copyright (c) 2025 FRC Team 1466
 // https://github.com/FRC1466
-//
-// Use of this source code is governed by an MIT-style
-// license that can be found in the LICENSE file at
-// the root directory of this project.
-
+ 
 package org.webbrobotics.frc2025.subsystems.drive.trajectory;
 
 import static org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOuterClass.*;
@@ -15,21 +11,19 @@ import edu.wpi.first.math.geometry.Translation2d;
 import java.util.*;
 import java.util.function.Function;
 import lombok.experimental.ExtensionMethod;
-import org.webbrobotics.frc2025.subsystems.drive.DriveConstants;
 
 /**
- * Contains predefined trajectories for the robot to follow.
- * Teams should define their game-specific trajectories in this class
- * following the examples provided.
+ * Contains predefined trajectories for the robot to follow. Teams should define their game-specific
+ * trajectories in this class following the examples provided.
  */
 @ExtensionMethod({TrajectoryGenerationHelpers.class})
 public class DriveTrajectories {
   public static final Map<String, List<PathSegment>> paths = new HashMap<>();
-  
+
   // List of functions that take a set of completed paths and return a map of
   // trajectories to generate (or null if they cannot be generated yet)
   public static final List<Function<Set<String>, Map<String, List<PathSegment>>>> suppliedPaths =
-      new ArrayList<>(); 
+      new ArrayList<>();
 
   // Example paths - used for preload of trajectory classes in drive constructor
   static {
