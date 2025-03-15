@@ -5,17 +5,17 @@
     "extensions": [
       {
         "name": "Sim GUI",
-        "libName": "/Users/2028thao/Documents/GitHub/Webb-Swerve-Lib/Webb-Swerve-Lib/build/jni/release/libhalsim_gui.dylib",
+        "libName": "C:\\Github\\Webb-Swerve-Lib\\Webb-Swerve-Lib\\build\\jni\\release\\halsim_gui.dll",
         "defaultEnabled": true
       },
       {
         "name": "Use Real DriverStation",
-        "libName": "/Users/2028thao/Documents/GitHub/Webb-Swerve-Lib/Webb-Swerve-Lib/build/jni/release/libhalsim_ds_socket.dylib",
+        "libName": "C:\\Github\\Webb-Swerve-Lib\\Webb-Swerve-Lib\\build\\jni\\release\\halsim_ds_socket.dll",
         "defaultEnabled": false
       }
     ],
     "environment": {},
-    "libraryDir": "/Users/2028thao/Documents/GitHub/Webb-Swerve-Lib/Webb-Swerve-Lib/build/jni/release",
+    "libraryDir": "C:\\Github\\Webb-Swerve-Lib\\Webb-Swerve-Lib\\build\\jni\\release",
     "mainClassName": "org.webbrobotics.frc2025.Main"
   }
 ]
