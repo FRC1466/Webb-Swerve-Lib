@@ -49,6 +49,7 @@ public class LoggedTunableNumber implements DoubleSupplier {
    *
    * @param defaultValue The default value
    */
+  @SuppressWarnings("unused")
   public void initDefault(double defaultValue) {
     if (!hasDefault) {
       hasDefault = true;
@@ -64,6 +65,7 @@ public class LoggedTunableNumber implements DoubleSupplier {
    *
    * @return The current value
    */
+  @SuppressWarnings("unused")
   public double get() {
     if (!hasDefault) {
       return 0.0;

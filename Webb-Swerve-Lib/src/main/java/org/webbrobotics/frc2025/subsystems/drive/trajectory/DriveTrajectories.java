@@ -7,10 +7,11 @@ import static org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectorySe
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Translation2d;
 import java.util.*;
 import java.util.function.Function;
 import lombok.experimental.ExtensionMethod;
+import org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOuterClass.PathSegment;
+import org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOuterClass.Waypoint;
 
 /**
  * Contains predefined trajectories for the robot to follow. Teams should define their game-specific
@@ -34,17 +35,7 @@ public class DriveTrajectories {
             PathSegment.newBuilder()
                 .addPoseWaypoint(Pose2d.kZero)
                 .addPoseWaypoint(new Pose2d(3.0, 2.0, Rotation2d.fromDegrees(180.0)))
-                .build()));
-
-    // A more complex path with multiple waypoints
-    paths.put(
-        "examplePath",
-        List.of(
-            PathSegment.newBuilder()
-                .addPoseWaypoint(Pose2d.kZero)
-                .addTranslationWaypoint(new Translation2d(2, 3))
-                .addPoseWaypoint(new Pose2d(0, 3, Rotation2d.fromDegrees(270.0)))
-                .addPoseWaypoint(new Pose2d(2, 0.6, Rotation2d.fromDegrees(30.0)))
+                .setMaxVelocity(2.0) // m/s
                 .build()));
   }
 
