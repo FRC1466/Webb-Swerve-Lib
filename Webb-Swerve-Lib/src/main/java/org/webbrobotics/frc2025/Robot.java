@@ -40,7 +40,6 @@ import org.webbrobotics.frc2025.util.NTClientLogger;
 import org.webbrobotics.frc2025.util.PhoenixUtil;
 import org.webbrobotics.frc2025.util.SystemTimeValidReader;
 import org.webbrobotics.frc2025.util.VirtualSubsystem;
-import org.webbrobotics.frc2025.util.rlog.RLOGServer;
 
 public class Robot extends LoggedRobot {
   private static final double loopOverrunWarningTimeout = 0.2;
@@ -110,7 +109,8 @@ public class Robot extends LoggedRobot {
 
       case SIM:
         // Running a physics simulator, log to NT
-        Logger.addDataReceiver(new RLOGServer());
+        Logger.addDataReceiver(new NT4Publisher());
+        Logger.addDataReceiver(new WPILOGWriter());
         break;
 
       case REPLAY:
