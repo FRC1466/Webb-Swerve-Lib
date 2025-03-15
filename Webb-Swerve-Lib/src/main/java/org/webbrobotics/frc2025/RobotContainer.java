@@ -18,6 +18,7 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
+import lombok.Getter;
 import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
@@ -42,7 +43,7 @@ import org.webbrobotics.frc2025.util.TriggerUtil;
 public class RobotContainer {
   // Subsystems
   private Drive drive;
-  private Vision vision;
+  @Getter private Vision vision;
 
   Leds leds = new Leds();
 
@@ -111,11 +112,7 @@ public class RobotContainer {
               new ModuleIO() {});
     }
     if (vision == null) {
-      switch (Constants.getRobot()) {
-        case COMPBOT -> vision = new Vision();
-        case DEVBOT -> vision = new Vision();
-        default -> vision = new Vision();
-      }
+      vision = new Vision();
     }
 
     // Set up auto routines

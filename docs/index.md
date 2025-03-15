@@ -31,6 +31,8 @@ Webb-Swerve-Lib is a robust swerve drive implementation for FRC robots developed
 - [Command Structure](command-structure.md) - Understanding the command hierarchy
 - [Odometry and Localization](odometry-localization.md) - How the robot tracks its position
 - [Utility Classes](utility-classes.md) - Documentation for helper utilities
+- [Vision System](vision-system.md) - Details on the vision system and its usage
+- [Hardware Abstraction Layer (HAL)](hal.md) - Information on HAL and when to disable it
 
 ### Reference
 - [API Reference](api-reference.md) - Detailed class and method documentation

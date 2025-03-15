@@ -150,7 +150,7 @@ test {
 }
 
 // Simulation configuration (e.g. environment variables). Set to false for log replay, change for simulation
-wpi.sim.addGui().defaultEnabled = false
+wpi.sim.addGui().defaultEnabled = true
 wpi.sim.addDriverstation()
 
 // Setting up my Jar File. In this case, adding all libraries into the main jar ('fat jar')

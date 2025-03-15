@@ -11,6 +11,8 @@
 5. [Common Issues and Solutions](#5-common-issues-and-solutions)
 6. [Command Reference](#6-command-reference)
 7. [Quick Reference Tables](#7-quick-reference-tables)
+8. [Vision System](#8-vision-system)
+9. [Hardware Abstraction Layer (HAL)](#9-hardware-abstraction-layer)
 
 ---
 
@@ -328,6 +330,67 @@ public class ExampleAuto extends SequentialCommandGroup {
             new IntakeCommand(intake),
             new DriveTrajectory(drive, new HolonomicTrajectory("path2"))
         );
+    }
+}
+```
+
+## 8. Vision System
+### Overview
+The vision system in Webb-Swerve-Lib uses PhotonVision to detect AprilTags on the field and estimate the robot's pose. This system is crucial for accurate autonomous navigation and alignment tasks.
+
+### Key Components
+- **PhotonCamera**: Captures images and detects AprilTags.
+- **PhotonPoseEstimator**: Estimates the robot's pose based on detected tags.
+- **VisionSystemSim**: Simulates the vision system for testing and development.
+- **Field2d**: Visualizes the robot and detected tags on a field diagram.
+
+### Vision Code Details
+The vision code is implemented in the `Vision` class, which handles camera initialization, pose estimation, and logging. Key methods include:
+- `getEstimatedGlobalPose()`: Returns the latest estimated robot pose based on vision data.
+- `updateEstimationStdDevs()`: Calculates dynamic standard deviations for pose estimation based on the number of detected tags and their distances.
+- `logCameraData()`: Logs data from individual cameras, including detected tag IDs and poses.
+- `logSeenAprilTags()`: Logs all AprilTags that have been seen at least once during the match.
+
+### Example Usage
+To use the vision system, create an instance of the `Vision` class and call its methods in your robot code. For example:
+```java
+Vision vision = new Vision();
+Optional<EstimatedRobotPose> pose = vision.getEstimatedGlobalPose();
+pose.ifPresent(p -> {
+    // Use the estimated pose for navigation or alignment
+    System.out.println("Estimated Pose: " + p.estimatedPose);
+});
+```
+
+### Simulation
+The vision system can be simulated using the `VisionSystemSim` class. This allows you to test your vision code without a physical robot. To enable simulation, call the `simulationPeriodic()` method with the simulated robot pose:
+```java
+vision.simulationPeriodic(simulatedPose);
+```
+
+## 9. Hardware Abstraction Layer (HAL)
+### Overview
+The Hardware Abstraction Layer (HAL) isolates hardware-specific code from the rest of the robot code. This allows for easier testing and development, as well as better code organization.
+
+### Disabling HAL
+In some cases, you may need to disable the HAL, such as when running simulations or using certain testing frameworks. To disable the HAL, set the `disableHAL` flag to `true` in your configuration:
+```java
+Constants.disableHAL = true;
+```
+
+### When to Disable HAL
+- **Simulation**: When running robot code in a simulated environment.
+- **Testing**: When using testing frameworks that do not support the HAL.
+- **Development**: When developing code that does not interact with hardware.
+
+### Example
+To disable the HAL for simulation, update your robot initialization code:
+```java
+public class Robot extends TimedRobot {
+    @Override
+    public void robotInit() {
+        Constants.disableHAL = true;
+        // Other initialization code
     }
 }
 ```

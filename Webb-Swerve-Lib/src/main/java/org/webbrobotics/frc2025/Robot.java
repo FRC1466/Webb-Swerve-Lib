@@ -3,7 +3,12 @@
  
 package org.webbrobotics.frc2025;
 
+import com.ctre.phoenix6.Utils;
 import edu.wpi.first.hal.AllianceStationID;
+import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.numbers.N1;
+import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -25,7 +30,7 @@ import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.inputs.LoggedPowerDistribution;
-import org.littletonrobotics.junction.rlog.RLOGServer;
+import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 import org.webbrobotics.frc2025.Constants.RobotType;
@@ -96,7 +101,7 @@ public class Robot extends LoggedRobot {
       case REAL:
         // Running on a real robot, log to a USB stick ("/U/logs")
         Logger.addDataReceiver(new WPILOGWriter());
-        Logger.addDataReceiver(new RLOGServer());
+        Logger.addDataReceiver(new NT4Publisher());
         if (Constants.getRobot() == RobotType.COMPBOT) {
           LoggedPowerDistribution.getInstance(50, ModuleType.kRev);
         }
@@ -104,7 +109,7 @@ public class Robot extends LoggedRobot {
 
       case SIM:
         // Running a physics simulator, log to NT
-        Logger.addDataReceiver(new RLOGServer());
+        Logger.addDataReceiver(new NT4Publisher());
         Logger.addDataReceiver(new WPILOGWriter());
         break;
 
@@ -205,6 +210,17 @@ public class Robot extends LoggedRobot {
         }
         autoMessagePrinted = true;
       }
+
+      var visionEst = robotContainer.getVision().getEstimatedGlobalPose();
+      visionEst.ifPresent(
+          est -> {
+            var estStdDevs = robotContainer.getVision().getEstimationStdDevs();
+            RobotState.getInstance()
+                .addVisionMeasurement(
+                    est.estimatedPose.toPose2d(),
+                    Utils.fpgaToCurrentTime(est.timestampSeconds),
+                    estStdDevs);
+          });
     }
 
     // Robot container periodic methods
@@ -298,5 +314,22 @@ public class Robot extends LoggedRobot {
 
   /** This function is called periodically whilst in simulation. */
   @Override
-  public void simulationPeriodic() {}
+  public void simulationPeriodic() {
+    Pose2d currentPose = RobotState.getInstance().getEstimatedPose();
+    robotContainer.getVision().simulationPeriodic(currentPose);
+
+    // Get and process vision measurements in simulation, similar to robotPeriodic
+    var visionEstimate = robotContainer.getVision().getEstimatedGlobalPose();
+    visionEstimate.ifPresent(
+        est -> {
+          // Get the standard deviations from Vision
+          Matrix<N3, N1> stdDevs = robotContainer.getVision().getEstimationStdDevs();
+
+          // Add the vision measurement with its standard deviations
+          RobotState.getInstance()
+              .addVisionMeasurement(est.estimatedPose.toPose2d(), est.timestampSeconds, stdDevs);
+          Logger.recordOutput("Vision/SimMeasurementTimestamp", est.timestampSeconds);
+          Logger.recordOutput("Vision/SimMeasurementPose", est.estimatedPose.toPose2d());
+        });
+  }
 }

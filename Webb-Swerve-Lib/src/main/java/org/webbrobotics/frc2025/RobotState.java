@@ -18,6 +18,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.junction.AutoLogOutput;
+import org.littletonrobotics.junction.Logger;
 import org.webbrobotics.frc2025.subsystems.drive.DriveConstants;
 import org.webbrobotics.frc2025.util.GeomUtil;
 
@@ -112,7 +113,26 @@ public class RobotState {
     // Any logging that might be needed can go here
   }
 
+  /**
+   * Add a vision measurement to the pose estimator with default standard deviations.
+   *
+   * @param visionPose The pose measured by vision
+   * @param timestamp The timestamp when the measurement was taken
+   */
   public void addVisionMeasurement(Pose2d visionPose, double timestamp) {
+    // Use default standard deviations - this will apply less weight to vision measurements
+    Matrix<N3, N1> defaultStdDevs = new Matrix<>(VecBuilder.fill(4, 4, 8));
+    addVisionMeasurement(visionPose, timestamp, defaultStdDevs);
+  }
+
+  /**
+   * Add a vision measurement to the pose estimator with specified standard deviations.
+   *
+   * @param visionPose The pose measured by vision
+   * @param timestamp The timestamp when the measurement was taken
+   * @param stdDevs Standard deviations of the vision measurement (x, y, theta)
+   */
+  public void addVisionMeasurement(Pose2d visionPose, double timestamp, Matrix<N3, N1> stdDevs) {
     // Get odometry based pose at timestamp
     var sample = poseBuffer.getSample(timestamp);
     if (sample.isEmpty()) {
@@ -129,9 +149,26 @@ public class RobotState {
     // difference between estimate and vision pose
     Transform2d transform = new Transform2d(estimateAtTime, visionPose);
 
+    // Calculate a single confidence factor between 0 and 1
+    // Average the standard deviations and map to a confidence factor
+    double avgStdDev = (stdDevs.get(0, 0) + stdDevs.get(1, 0) + stdDevs.get(2, 0)) / 3.0;
+    double confidenceFactor = 1.0 / (1.0 + avgStdDev);
+
+    // Apply a partial correction based on confidence
+    Transform2d correctionTransform =
+        new Transform2d(
+            transform.getTranslation().getX() * confidenceFactor,
+            transform.getTranslation().getY() * confidenceFactor,
+            new Rotation2d(transform.getRotation().getRadians() * confidenceFactor));
+
     // Recalculate current estimate by applying transform to old estimate
     // then replaying odometry data
-    estimatedPose = estimateAtTime.plus(transform).plus(sampleToOdometryTransform);
+    estimatedPose = estimateAtTime.plus(correctionTransform).plus(sampleToOdometryTransform);
+
+    // Log the standard deviations used
+    Logger.recordOutput("Vision/MeasurementStdDevX", stdDevs.get(0, 0));
+    Logger.recordOutput("Vision/MeasurementStdDevY", stdDevs.get(1, 0));
+    Logger.recordOutput("Vision/MeasurementStdDevTheta", stdDevs.get(2, 0));
   }
 
   public record OdometryObservation(

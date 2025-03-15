@@ -6,7 +6,7 @@
       {
         "name": "Sim GUI",
         "libName": "/Users/2028thao/Documents/GitHub/Webb-Swerve-Lib/Webb-Swerve-Lib/build/jni/release/libhalsim_gui.dylib",
-        "defaultEnabled": false
+        "defaultEnabled": true
       },
       {
         "name": "Use Real DriverStation",
