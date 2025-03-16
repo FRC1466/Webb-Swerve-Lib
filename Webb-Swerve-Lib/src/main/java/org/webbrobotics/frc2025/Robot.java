@@ -3,12 +3,8 @@
  
 package org.webbrobotics.frc2025;
 
-import com.ctre.phoenix6.Utils;
+import com.ctre.phoenix6.hardware.TalonFX;
 import edu.wpi.first.hal.AllianceStationID;
-import edu.wpi.first.math.Matrix;
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.numbers.N1;
-import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -34,16 +30,19 @@ import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 import org.webbrobotics.frc2025.Constants.RobotType;
-import org.webbrobotics.frc2025.subsystems.leds.Leds;
+import org.webbrobotics.frc2025.RobotState.VisionObservation;
+import org.webbrobotics.frc2025.util.CanivoreReader;
 import org.webbrobotics.frc2025.util.LoggedTracer;
 import org.webbrobotics.frc2025.util.NTClientLogger;
 import org.webbrobotics.frc2025.util.PhoenixUtil;
 import org.webbrobotics.frc2025.util.SystemTimeValidReader;
 import org.webbrobotics.frc2025.util.VirtualSubsystem;
+import org.webbrobotics.frc2025.util.rlog.RLOGServer;
 
 public class Robot extends LoggedRobot {
   private static final double loopOverrunWarningTimeout = 0.2;
   private static final double canErrorTimeThreshold = 0.5; // Seconds to disable alert
+  private static final double canivoreErrorTimeThreshold = 0.5;
   private static final double lowBatteryVoltage = 11.8;
   private static final double lowBatteryDisabledTime = 1.5;
   private static final double lowBatteryMinCycleCount = 10;
@@ -55,12 +54,14 @@ public class Robot extends LoggedRobot {
   private boolean autoMessagePrinted;
   private final Timer canInitialErrorTimer = new Timer();
   private final Timer canErrorTimer = new Timer();
+  private final Timer canivoreErrorTimer = new Timer();
   private final Timer disabledTimer = new Timer();
-
-  Leds leds = new Leds();
+  private final CanivoreReader canivoreReader = new CanivoreReader("*");
 
   private final Alert canErrorAlert =
       new Alert("CAN errors detected, robot may not be controllable.", AlertType.kError);
+  private final Alert canivoreErrorAlert =
+      new Alert("CANivore errors detected, robot may not be controllable.", AlertType.kError);
   private final Alert lowBatteryAlert =
       new Alert(
           "Battery voltage is very low, consider turning off the robot or replacing the battery.",
@@ -69,10 +70,12 @@ public class Robot extends LoggedRobot {
       new Alert("Please wait to enable, JITing in progress.", AlertType.kWarning);
 
   public Robot() {
-    robotContainer = new RobotContainer();
-
-    // Start loading animation
-    leds.loadingLights();
+    // Reset encoder on pivot
+    if (Constants.getRobot() == RobotType.COMPBOT) {
+      var pivotTalon = new TalonFX(5);
+      PhoenixUtil.tryUntilOk(15, () -> pivotTalon.setPosition(0.0));
+      pivotTalon.close();
+    }
 
     // Record metadata
     Logger.recordMetadata("Robot", Constants.getRobot().toString());
@@ -101,7 +104,7 @@ public class Robot extends LoggedRobot {
       case REAL:
         // Running on a real robot, log to a USB stick ("/U/logs")
         Logger.addDataReceiver(new WPILOGWriter());
-        Logger.addDataReceiver(new NT4Publisher());
+        Logger.addDataReceiver(new RLOGServer());
         if (Constants.getRobot() == RobotType.COMPBOT) {
           LoggedPowerDistribution.getInstance(50, ModuleType.kRev);
         }
@@ -110,7 +113,6 @@ public class Robot extends LoggedRobot {
       case SIM:
         // Running a physics simulator, log to NT
         Logger.addDataReceiver(new NT4Publisher());
-        Logger.addDataReceiver(new WPILOGWriter());
         break;
 
       case REPLAY:
@@ -165,6 +167,7 @@ public class Robot extends LoggedRobot {
     // Reset alert timers
     canInitialErrorTimer.restart();
     canErrorTimer.restart();
+    canivoreErrorTimer.restart();
     disabledTimer.restart();
 
     // Configure brownout voltage
@@ -183,9 +186,20 @@ public class Robot extends LoggedRobot {
     Threads.setCurrentThreadPriority(true, 10);
   }
 
-  /** This function is called periodically in all modes. */
+  /** This function is called periodically during all modes. */
   @Override
   public void robotPeriodic() {
+    var visionEst = robotContainer.getVision().getEstimatedGlobalPose();
+    if (Constants.getRobot() != RobotType.SIMBOT) {
+      visionEst.ifPresent(
+          est -> {
+            var estStdDevs = robotContainer.getVision().getEstimationStdDevs();
+            RobotState.getInstance()
+                .addVisionObservation(
+                    new VisionObservation(
+                        est.estimatedPose.toPose2d(), est.timestampSeconds, estStdDevs));
+          });
+    }
     // Refresh all Phoenix signals
     LoggedTracer.reset();
     PhoenixUtil.refreshAll();
@@ -196,7 +210,7 @@ public class Robot extends LoggedRobot {
 
     // Run command scheduler
     CommandScheduler.getInstance().run();
-    LoggedTracer.record("commands");
+    LoggedTracer.record("Commands");
 
     // Print auto duration
     if (autonomousCommand != null) {
@@ -210,17 +224,6 @@ public class Robot extends LoggedRobot {
         }
         autoMessagePrinted = true;
       }
-
-      var visionEst = robotContainer.getVision().getEstimatedGlobalPose();
-      visionEst.ifPresent(
-          est -> {
-            var estStdDevs = robotContainer.getVision().getEstimationStdDevs();
-            RobotState.getInstance()
-                .addVisionMeasurement(
-                    est.estimatedPose.toPose2d(),
-                    Utils.fpgaToCurrentTime(est.timestampSeconds),
-                    estStdDevs);
-          });
     }
 
     // Robot container periodic methods
@@ -236,6 +239,27 @@ public class Robot extends LoggedRobot {
         !canErrorTimer.hasElapsed(canErrorTimeThreshold)
             && !canInitialErrorTimer.hasElapsed(canErrorTimeThreshold));
 
+    // Log CANivore status
+    if (Constants.getMode() == Constants.Mode.REAL) {
+      var canivoreStatus = canivoreReader.getStatus();
+      if (canivoreStatus.isPresent()) {
+        Logger.recordOutput("CANivoreStatus/Status", canivoreStatus.get().Status.getName());
+        Logger.recordOutput("CANivoreStatus/Utilization", canivoreStatus.get().BusUtilization);
+        Logger.recordOutput("CANivoreStatus/OffCount", canivoreStatus.get().BusOffCount);
+        Logger.recordOutput("CANivoreStatus/TxFullCount", canivoreStatus.get().TxFullCount);
+        Logger.recordOutput("CANivoreStatus/ReceiveErrorCount", canivoreStatus.get().REC);
+        Logger.recordOutput("CANivoreStatus/TransmitErrorCount", canivoreStatus.get().TEC);
+        if (!canivoreStatus.get().Status.isOK()
+            || canStatus.transmitErrorCount > 0
+            || canStatus.receiveErrorCount > 0) {
+          canivoreErrorTimer.restart();
+        }
+      }
+      canivoreErrorAlert.set(
+          !canivoreErrorTimer.hasElapsed(canivoreErrorTimeThreshold)
+              && !canInitialErrorTimer.hasElapsed(canErrorTimeThreshold));
+    }
+
     // Log NT client list
     NTClientLogger.log();
 
@@ -248,7 +272,6 @@ public class Robot extends LoggedRobot {
         && disabledTimer.hasElapsed(lowBatteryDisabledTime)
         && lowBatteryCycleCount >= lowBatteryMinCycleCount) {
       lowBatteryAlert.set(true);
-      leds.warningLights();
     }
 
     // JIT alert
@@ -277,6 +300,7 @@ public class Robot extends LoggedRobot {
   /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
   public void autonomousInit() {
+    autoStart = Timer.getTimestamp();
     autonomousCommand = robotContainer.getAutonomousCommand();
 
     if (autonomousCommand != null) {
@@ -314,22 +338,5 @@ public class Robot extends LoggedRobot {
 
   /** This function is called periodically whilst in simulation. */
   @Override
-  public void simulationPeriodic() {
-    Pose2d currentPose = RobotState.getInstance().getEstimatedPose();
-    robotContainer.getVision().simulationPeriodic(currentPose);
-
-    // Get and process vision measurements in simulation, similar to robotPeriodic
-    var visionEstimate = robotContainer.getVision().getEstimatedGlobalPose();
-    visionEstimate.ifPresent(
-        est -> {
-          // Get the standard deviations from Vision
-          Matrix<N3, N1> stdDevs = robotContainer.getVision().getEstimationStdDevs();
-
-          // Add the vision measurement with its standard deviations
-          RobotState.getInstance()
-              .addVisionMeasurement(est.estimatedPose.toPose2d(), est.timestampSeconds, stdDevs);
-          Logger.recordOutput("Vision/SimMeasurementTimestamp", est.timestampSeconds);
-          Logger.recordOutput("Vision/SimMeasurementPose", est.estimatedPose.toPose2d());
-        });
-  }
+  public void simulationPeriodic() {}
 }

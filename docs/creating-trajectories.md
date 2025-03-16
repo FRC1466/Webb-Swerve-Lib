@@ -94,7 +94,6 @@ Control the behavior of your trajectory with constraints:
 
 ```java
 .setMaxVelocity(2.0) // Maximum velocity in m/s
-.setMaxAcceleration(1.5) // Maximum acceleration in m/s²
 .setStartVelocity(0.0) // Starting velocity
 .setEndVelocity(0.0) // Ending velocity
 .setReversed(false) // Drive forward (true for reverse)
@@ -116,21 +115,19 @@ Once you've defined your trajectories, you need to generate them:
 
 ```java
 // In your DriveTrajectories.java class
-public DriveTrajectories() {
-    // Define trajectories in the paths map
-    defineTrajectories();
-    
-    // Generate all trajectories
-    paths.forEach((name, segments) -> {
-        trajectories.put(name, generateTrajectory(segments));
-    });
-}
-
-private HolonomicTrajectory generateTrajectory(List<PathSegment> segments) {
-    // Implementation depends on the trajectory generation method
-    // This is handled internally by the library
+static {
+    // A simple straight line path
+    paths.put(
+        "driveStraight",
+        List.of(
+            PathSegment.newBuilder()
+                .addPoseWaypoint(Pose2d.kZero)
+                .addPoseWaypoint(new Pose2d(3.0, 2.0, Rotation2d.fromDegrees(180.0)))
+                .build()));
 }
 ```
+All trajectory generation is done through docker. The github package can be found here: [VTS](https://github.com/Mechanical-Advantage/RobotCode2024/pkgs/container/vts)
+Once this is running the builds should be successful.
 
 ## Using Trajectories in Autonomous Commands
 
@@ -138,7 +135,21 @@ Once trajectories are generated, you can use them in autonomous commands:
 
 ```java
 public class SampleAutoRoutine extends SequentialCommandGroup {
-    public SampleAutoRoutine(Drive driveSubsystem, OtherSubsystem otherSubsystem) {
+    public Command exampleAuto() {
+        Timer autoTimer = new Timer();
+        return Commands.runONce(
+            () -> {
+              RobotState.getInstance()
+                  .resetPose(
+                      AllianceFlipUtil.apply(
+                          MirrorUtil.apply(
+                              new Pose2d(
+                                  startingLineX - DriveConstants.robotWidth / 2.0,
+                                  fieldWidth - FieldConstants.Barge.closeCage.getY(),
+                                  Rotation2d.kCCW_Pi_2))));
+              autoTimer.restart();
+            })
+        .andThen
         // Load the trajectory
         HolonomicTrajectory driveToGoalTrajectory = new HolonomicTrajectory("driveToGoal");
         

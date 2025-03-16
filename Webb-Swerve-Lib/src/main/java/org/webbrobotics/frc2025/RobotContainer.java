@@ -23,6 +23,8 @@ import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 import org.webbrobotics.frc2025.commands.DriveCommands;
+import org.webbrobotics.frc2025.commands.DriveTrajectory;
+import org.webbrobotics.frc2025.commands.auto.AutoBuilder;
 import org.webbrobotics.frc2025.subsystems.drive.Drive;
 import org.webbrobotics.frc2025.subsystems.drive.DriveConstants;
 import org.webbrobotics.frc2025.subsystems.drive.GyroIO;
@@ -31,7 +33,7 @@ import org.webbrobotics.frc2025.subsystems.drive.ModuleIO;
 import org.webbrobotics.frc2025.subsystems.drive.ModuleIOComp;
 import org.webbrobotics.frc2025.subsystems.drive.ModuleIODev;
 import org.webbrobotics.frc2025.subsystems.drive.ModuleIOSim;
-import org.webbrobotics.frc2025.subsystems.leds.Leds;
+import org.webbrobotics.frc2025.subsystems.drive.trajectory.HolonomicTrajectory;
 import org.webbrobotics.frc2025.subsystems.vision.Vision;
 import org.webbrobotics.frc2025.util.AllianceFlipUtil;
 import org.webbrobotics.frc2025.util.DoublePressTracker;
@@ -44,8 +46,6 @@ public class RobotContainer {
   // Subsystems
   private Drive drive;
   @Getter private Vision vision;
-
-  Leds leds = new Leds();
 
   // Controllers
   private final CommandXboxController driver = new CommandXboxController(0);
@@ -110,8 +110,6 @@ public class RobotContainer {
               new ModuleIO() {},
               new ModuleIO() {},
               new ModuleIO() {});
-    }
-    if (vision == null) {
       vision = new Vision();
     }
 
@@ -121,6 +119,17 @@ public class RobotContainer {
     mirror.addDefaultOption("Yes", false);
     mirror.addOption("No", true);
     MirrorUtil.setMirror(mirror::get);
+
+    var autoBuilder = new AutoBuilder(drive);
+    HolonomicTrajectory testTrajectory = new HolonomicTrajectory("driveStraight");
+    autoChooser.addOption(
+        "Taxi",
+        Commands.runOnce(
+                () ->
+                    RobotState.getInstance()
+                        .resetPose(AllianceFlipUtil.apply(testTrajectory.getStartPose())))
+            .andThen(new DriveTrajectory(drive, testTrajectory)));
+    autoChooser.addOption("Up in the Inspirational Auto", autoBuilder.upInTheInspirationalAuto());
 
     configureBindings();
   }
@@ -161,10 +170,7 @@ public class RobotContainer {
                     && DriverStation.getMatchTime() > 0
                     && DriverStation.getMatchTime() <= Math.round(endgameAlert1.get()))
         .onTrue(
-            controllerRumbleCommand()
-                .withTimeout(0.5)
-                .alongWith(Commands.runOnce(() -> leds.rainbowPartyLights()))
-                .andThen(Commands.waitUntil(() -> false)));
+            controllerRumbleCommand().withTimeout(0.5).andThen(Commands.waitUntil(() -> false)));
     new Trigger(
             () ->
                 DriverStation.isTeleopEnabled()
@@ -176,7 +182,6 @@ public class RobotContainer {
                 .andThen(Commands.waitSeconds(0.1))
                 .repeatedly()
                 .withTimeout(0.9)
-                .alongWith(Commands.runOnce(() -> leds.rainbowPartyLights()))
                 .andThen(Commands.waitUntil(() -> false)));
   }
 
@@ -203,6 +208,6 @@ public class RobotContainer {
   }
 
   public Command getAutonomousCommand() {
-    return Commands.print(autoChooser.get() != null ? "Selected Auto" : "No Auto Selected");
+    return autoChooser.get();
   }
 }

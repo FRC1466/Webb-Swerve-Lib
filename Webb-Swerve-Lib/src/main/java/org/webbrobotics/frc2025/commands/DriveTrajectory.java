@@ -3,6 +3,8 @@
  
 package org.webbrobotics.frc2025.commands;
 
+import static org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOuterClass.*;
+
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -19,7 +21,6 @@ import java.util.function.Supplier;
 import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
-import org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOuterClass.VehicleState;
 import org.webbrobotics.frc2025.Constants;
 import org.webbrobotics.frc2025.RobotState;
 import org.webbrobotics.frc2025.subsystems.drive.Drive;

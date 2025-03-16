@@ -13,7 +13,10 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.Timer;
 import java.util.*;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.ExtensionMethod;
@@ -21,10 +24,20 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 import org.webbrobotics.frc2025.subsystems.drive.DriveConstants;
 import org.webbrobotics.frc2025.util.GeomUtil;
+import org.webbrobotics.frc2025.util.LoggedTunableNumber;
 
 @ExtensionMethod({GeomUtil.class})
 public class RobotState {
+  // Must be less than 2.0
+  private static final LoggedTunableNumber txTyObservationStaleSecs =
+      new LoggedTunableNumber("RobotState/TxTyObservationStaleSeconds", 0.5);
+  private static final LoggedTunableNumber minDistanceTagPoseBlend =
+      new LoggedTunableNumber("RobotState/MinDistanceTagPoseBlend", Units.inchesToMeters(24.0));
+  private static final LoggedTunableNumber maxDistanceTagPoseBlend =
+      new LoggedTunableNumber("RobotState/MaxDistanceTagPoseBlend", Units.inchesToMeters(36.0));
+
   private static final double poseBufferSizeSec = 2.0;
+  private static final double algaePersistanceTime = 2.0;
   private static final Matrix<N3, N1> odometryStateStdDevs =
       new Matrix<>(VecBuilder.fill(0.003, 0.003, 0.002));
 
@@ -42,7 +55,6 @@ public class RobotState {
   private final TimeInterpolatableBuffer<Pose2d> poseBuffer =
       TimeInterpolatableBuffer.createBuffer(poseBufferSizeSec);
   private final Matrix<N3, N1> qStdDevs = new Matrix<>(Nat.N3(), Nat.N1());
-
   // Odometry
   private final SwerveDriveKinematics kinematics;
   private SwerveModulePosition[] lastWheelPositions =
@@ -55,17 +67,24 @@ public class RobotState {
   // Assume gyro starts at zero
   private Rotation2d gyroOffset = Rotation2d.kZero;
 
+  private final Map<Integer, TxTyPoseRecord> txTyPoses = new HashMap<>();
+  private Set<AlgaePoseRecord> algaePoses = new HashSet<>();
+
   @Getter
   @AutoLogOutput(key = "RobotState/RobotVelocity")
   private ChassisSpeeds robotVelocity = new ChassisSpeeds();
 
   @Getter @Setter private OptionalDouble distanceToBranch = OptionalDouble.empty();
 
-  public RobotState() {
+  private RobotState() {
     for (int i = 0; i < 3; ++i) {
       qStdDevs.set(i, 0, Math.pow(odometryStateStdDevs.get(i, 0), 2));
     }
     kinematics = new SwerveDriveKinematics(DriveConstants.moduleTranslations);
+
+    for (int i = 1; i <= FieldConstants.aprilTagCount; i++) {
+      txTyPoses.put(i, new TxTyPoseRecord(new Pose2d(), Double.POSITIVE_INFINITY, -1.0));
+    }
   }
 
   public void resetPose(Pose2d pose) {
@@ -96,45 +115,17 @@ public class RobotState {
     estimatedPose = estimatedPose.exp(finalTwist);
   }
 
-  public void addDriveSpeeds(ChassisSpeeds speeds) {
-    robotVelocity = speeds;
-  }
-
-  @AutoLogOutput(key = "RobotState/FieldVelocity")
-  public ChassisSpeeds getFieldVelocity() {
-    return ChassisSpeeds.fromRobotRelativeSpeeds(robotVelocity, getRotation());
-  }
-
-  public Rotation2d getRotation() {
-    return estimatedPose.getRotation();
-  }
-
-  public void periodicLog() {
-    // Any logging that might be needed can go here
-  }
-
-  /**
-   * Add a vision measurement to the pose estimator with default standard deviations.
-   *
-   * @param visionPose The pose measured by vision
-   * @param timestamp The timestamp when the measurement was taken
-   */
-  public void addVisionMeasurement(Pose2d visionPose, double timestamp) {
-    // Use default standard deviations - this will apply less weight to vision measurements
-    Matrix<N3, N1> defaultStdDevs = new Matrix<>(VecBuilder.fill(4, 4, 8));
-    addVisionMeasurement(visionPose, timestamp, defaultStdDevs);
-  }
-
-  /**
-   * Add a vision measurement to the pose estimator with specified standard deviations.
-   *
-   * @param visionPose The pose measured by vision
-   * @param timestamp The timestamp when the measurement was taken
-   * @param stdDevs Standard deviations of the vision measurement (x, y, theta)
-   */
-  public void addVisionMeasurement(Pose2d visionPose, double timestamp, Matrix<N3, N1> stdDevs) {
+  public void addVisionObservation(VisionObservation observation) {
+    // If measurement is old enough to be outside the pose buffer's timespan, skip.
+    try {
+      if (poseBuffer.getInternalBuffer().lastKey() - poseBufferSizeSec > observation.timestamp()) {
+        return;
+      }
+    } catch (NoSuchElementException ex) {
+      return;
+    }
     // Get odometry based pose at timestamp
-    var sample = poseBuffer.getSample(timestamp);
+    var sample = poseBuffer.getSample(observation.timestamp());
     if (sample.isEmpty()) {
       // exit if not there
       return;
@@ -146,31 +137,84 @@ public class RobotState {
     // get old estimate by applying odometryToSample Transform
     Pose2d estimateAtTime = estimatedPose.plus(odometryToSampleTransform);
 
+    // Calculate 3 x 3 vision matrix
+    var r = new double[3];
+    for (int i = 0; i < 3; ++i) {
+      r[i] = observation.stdDevs().get(i, 0) * observation.stdDevs().get(i, 0);
+    }
+    // Solve for closed form Kalman gain for continuous Kalman filter with A = 0
+    // and C = I. See wpimath/algorithms.md.
+    Matrix<N3, N3> visionK = new Matrix<>(Nat.N3(), Nat.N3());
+    for (int row = 0; row < 3; ++row) {
+      double stdDev = qStdDevs.get(row, 0);
+      if (stdDev == 0.0) {
+        visionK.set(row, row, 0.0);
+      } else {
+        visionK.set(row, row, stdDev / (stdDev + Math.sqrt(stdDev * r[row])));
+      }
+    }
     // difference between estimate and vision pose
-    Transform2d transform = new Transform2d(estimateAtTime, visionPose);
-
-    // Calculate a single confidence factor between 0 and 1
-    // Average the standard deviations and map to a confidence factor
-    double avgStdDev = (stdDevs.get(0, 0) + stdDevs.get(1, 0) + stdDevs.get(2, 0)) / 3.0;
-    double confidenceFactor = 1.0 / (1.0 + avgStdDev);
-
-    // Apply a partial correction based on confidence
-    Transform2d correctionTransform =
+    Transform2d transform = new Transform2d(estimateAtTime, observation.visionPose());
+    // scale transform by visionK
+    var kTimesTransform =
+        visionK.times(
+            VecBuilder.fill(
+                transform.getX(), transform.getY(), transform.getRotation().getRadians()));
+    Transform2d scaledTransform =
         new Transform2d(
-            transform.getTranslation().getX() * confidenceFactor,
-            transform.getTranslation().getY() * confidenceFactor,
-            new Rotation2d(transform.getRotation().getRadians() * confidenceFactor));
+            kTimesTransform.get(0, 0),
+            kTimesTransform.get(1, 0),
+            Rotation2d.fromRadians(kTimesTransform.get(2, 0)));
 
-    // Recalculate current estimate by applying transform to old estimate
+    // Recalculate current estimate by applying scaled transform to old estimate
     // then replaying odometry data
-    estimatedPose = estimateAtTime.plus(correctionTransform).plus(sampleToOdometryTransform);
+    estimatedPose = estimateAtTime.plus(scaledTransform).plus(sampleToOdometryTransform);
+  }
 
-    // Log the standard deviations used
-    Logger.recordOutput("Vision/MeasurementStdDevX", stdDevs.get(0, 0));
-    Logger.recordOutput("Vision/MeasurementStdDevY", stdDevs.get(1, 0));
-    Logger.recordOutput("Vision/MeasurementStdDevTheta", stdDevs.get(2, 0));
+  public void addDriveSpeeds(ChassisSpeeds speeds) {
+    robotVelocity = speeds;
+  }
+
+  @AutoLogOutput(key = "RobotState/FieldVelocity")
+  public ChassisSpeeds getFieldVelocity() {
+    return ChassisSpeeds.fromRobotRelativeSpeeds(robotVelocity, getRotation());
+  }
+
+  public Set<Translation2d> getAlgaeTranslations() {
+    return algaePoses.stream()
+        .filter((x) -> Timer.getTimestamp() - x.timestamp() < algaePersistanceTime)
+        .map(AlgaePoseRecord::translation)
+        .collect(Collectors.toSet());
+  }
+
+  public Rotation2d getRotation() {
+    return estimatedPose.getRotation();
+  }
+
+  public void periodicLog() {
+
+    // Log algae poses
+    Logger.recordOutput(
+        "RobotState/AlgaePoses",
+        getAlgaeTranslations().stream()
+            .map(
+                (translation) ->
+                    new Translation3d(
+                        translation.getX(), translation.getY(), FieldConstants.algaeDiameter / 2))
+            .toArray(Translation3d[]::new));
   }
 
   public record OdometryObservation(
       SwerveModulePosition[] wheelPositions, Optional<Rotation2d> gyroAngle, double timestamp) {}
+
+  public record VisionObservation(Pose2d visionPose, double timestamp, Matrix<N3, N1> stdDevs) {}
+
+  public record TxTyObservation(
+      int tagId, int camera, double[] tx, double[] ty, double distance, double timestamp) {}
+
+  public record TxTyPoseRecord(Pose2d pose, double distance, double timestamp) {}
+
+  public record AlgaeTxTyObservation(int camera, double[] tx, double[] ty, double timestamp) {}
+
+  public record AlgaePoseRecord(Translation2d translation, double timestamp) {}
 }

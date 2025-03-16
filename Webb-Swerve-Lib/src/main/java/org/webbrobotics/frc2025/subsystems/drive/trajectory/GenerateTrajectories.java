@@ -27,7 +27,7 @@ public class GenerateTrajectories {
     // Create vehicle model
     VehicleModel model =
         VehicleModel.newBuilder()
-            .setMass(105)
+            .setMass(67)
             .setMoi(5.8)
             .setVehicleLength(DriveConstants.trackWidthX)
             .setVehicleWidth(DriveConstants.trackWidthY)

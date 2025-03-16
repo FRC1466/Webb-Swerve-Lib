@@ -181,10 +181,7 @@ public class DriveToPose extends Command {
     lastSetpointTranslation =
         new Pose2d(
                 targetPose.getTranslation(),
-                new Rotation2d(
-                    Math.atan2(
-                        currentPose.getTranslation().getY() - targetPose.getTranslation().getY(),
-                        currentPose.getTranslation().getX() - targetPose.getTranslation().getX())))
+                currentPose.getTranslation().minus(targetPose.getTranslation()).getAngle())
             .transformBy(GeomUtil.toTransform2d(driveController.getSetpoint().position, 0.0))
             .getTranslation();
 
@@ -200,10 +197,7 @@ public class DriveToPose extends Command {
     Translation2d driveVelocity =
         new Pose2d(
                 Translation2d.kZero,
-                new Rotation2d(
-                    Math.atan2(
-                        currentPose.getTranslation().getY() - targetPose.getTranslation().getY(),
-                        currentPose.getTranslation().getX() - targetPose.getTranslation().getX())))
+                currentPose.getTranslation().minus(targetPose.getTranslation()).getAngle())
             .transformBy(GeomUtil.toTransform2d(driveVelocityScalar, 0.0))
             .getTranslation();
 
