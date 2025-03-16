@@ -23,6 +23,7 @@ import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 import org.webbrobotics.frc2025.commands.DriveCommands;
+import org.webbrobotics.frc2025.commands.DriveToPose;
 import org.webbrobotics.frc2025.commands.DriveTrajectory;
 import org.webbrobotics.frc2025.commands.auto.AutoBuilder;
 import org.webbrobotics.frc2025.subsystems.drive.Drive;
@@ -150,6 +151,25 @@ public class RobotContainer {
     Supplier<Command> joystickDriveCommandFactory =
         () -> DriveCommands.joystickDrive(drive, driverX, driverY, driverOmega, robotRelative);
     drive.setDefaultCommand(joystickDriveCommandFactory.get());
+
+    // Example Automatic Teleop Pathing Command (Designed for the 2025 REEFSCAPE Processor pose)
+    driver
+        .button(1)
+        .whileTrue(
+            new DriveToPose(
+                drive,
+                () -> {
+                  var targetPose = PathfindConstants.getBlueTargetPoseProcessor();
+                  return AllianceFlipUtil.shouldFlip()
+                      ? AllianceFlipUtil.apply(targetPose)
+                      : targetPose;
+                },
+                () -> RobotState.getInstance().getEstimatedPose(),
+                () ->
+                    DriveCommands.getLinearVelocityFromJoysticks(
+                            driverX.getAsDouble(), driverY.getAsDouble())
+                        .times(AllianceFlipUtil.shouldFlip() ? -1.0 : 1.0),
+                () -> DriveCommands.getOmegaFromJoysticks(driverOmega.getAsDouble())));
 
     // Reset gyro
     var driverStartAndBack = driver.start().and(driver.back());
